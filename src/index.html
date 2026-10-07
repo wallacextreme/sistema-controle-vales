@@ -41,6 +41,36 @@
             p, span, div { font-size: 11px !important; line-height: 1.3 !important; }
             .valor-box { border: 2px solid #000; padding: 10px; text-align: center; margin: 10px 0; }
             .valor-texto { font-size: 28px !important; font-weight: 900 !important; }
+
+            /* IMPRESSÃO A4 COMPLETA INDEPENDENTE - NOTAS A PRAZO E RECIBOS */
+            .a4-print-full {
+                width: 100%;
+                max-width: 210mm;
+                min-height: 297mm;
+                padding: 14mm 12mm;
+                margin: 0 auto;
+                box-sizing: border-box;
+                background: white;
+                color: black !important;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                font-family: 'Inter', sans-serif;
+            }
+            .a4-print-full h1 { font-size: 17px !important; font-weight: bold; margin: 0; }
+            .a4-print-full h2 { font-size: 13px !important; font-weight: bold; margin: 0; }
+            .a4-print-full p, .a4-print-full span, .a4-print-full div, .a4-print-full td, .a4-print-full th { 
+                font-size: 11px !important; 
+                line-height: 1.35 !important; 
+            }
+            .linha-assinatura-a4 {
+                border-top: 1.5px solid #000;
+                width: 44%;
+                text-align: center;
+                margin-top: 45px;
+                padding-top: 6px;
+                font-size: 10.5px !important;
+            }
         }
         
         .print-only { display: none; }
@@ -98,8 +128,28 @@
             </div>
         </header>
 
+        <!-- BARRA DE SELEÇÃO DE MÓDULOS (ABAS) -->
+        <nav class="bg-slate-900/90 border-b border-slate-800 px-4 py-2.5 sticky top-[73px] z-30 no-print backdrop-blur">
+            <div class="container mx-auto flex items-center justify-between gap-4 flex-wrap">
+                <div class="flex items-center gap-2">
+                    <button id="btnAbaVales" onclick="alternarAbaPrincipal('vales')" class="px-5 py-2.5 rounded-xl font-bold text-xs transition-all duration-200 flex items-center gap-2 bg-blue-600 text-white shadow-lg shadow-blue-600/30">
+                        <span>🏷️</span> VALES DE CRÉDITO
+                    </button>
+                    <button id="btnAbaNotasPrazo" onclick="alternarAbaPrincipal('notasPrazo')" class="px-5 py-2.5 rounded-xl font-bold text-xs transition-all duration-200 flex items-center gap-2 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white">
+                        <span>📅</span> NOTAS A PRAZO
+                    </button>
+                </div>
+                <div class="text-xs text-slate-400 flex items-center gap-2">
+                    <span>Módulo ativo:</span>
+                    <span id="badgeModuloAtivo" class="font-bold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-full border border-blue-500/20">Vales de Crédito</span>
+                </div>
+            </div>
+        </nav>
+
         <main class="container mx-auto p-4 md:p-6 space-y-6 no-print">
-            <div class="grid lg:grid-cols-12 gap-6">
+            <!-- ABA 1: VALES DE CRÉDITO (INALTERADO) -->
+            <div id="abaConteudoVales">
+                <div class="grid lg:grid-cols-12 gap-6">
                 <div class="lg:col-span-4">
                     <section class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
                         <h2 class="text-lg font-bold mb-5 flex items-center gap-2 text-blue-400">Novo Vale</h2>
@@ -162,8 +212,165 @@
                     </div>
                 </div>
             </div>
+            </div><!-- FIM ABA 1: VALES -->
+
+            <!-- ABA 2: NOTAS A PRAZO / CONTAS A RECEBER -->
+            <div id="abaConteudoNotasPrazo" class="hidden space-y-6">
+                <div class="grid lg:grid-cols-12 gap-6">
+                    <!-- FORMULÁRIO NOVA NOTA A PRAZO -->
+                    <div class="lg:col-span-4">
+                        <section class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
+                            <div class="flex items-center justify-between mb-5">
+                                <h2 class="text-lg font-bold flex items-center gap-2 text-indigo-400">
+                                    <span>📅</span> Nova Nota a Prazo
+                                </h2>
+                                <span class="text-[10px] bg-indigo-500/20 text-indigo-300 px-2.5 py-1 rounded-full font-bold border border-indigo-500/30">A RECEBER</span>
+                            </div>
+                            <form id="formCadastroNotaPrazo" class="space-y-4">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Emissão</label>
+                                        <input type="date" id="campoNotaDataEmissao" required onchange="aoMudarDataOuPrazoNota()" class="w-full bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm text-white">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Prazo (Dias)</label>
+                                        <input type="number" id="campoNotaPrazoDias" value="30" min="1" max="365" required oninput="aoMudarDataOuPrazoNota()" class="w-full bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm text-white">
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Data de Vencimento</label>
+                                    <input type="date" id="campoNotaDataVencimento" required class="w-full bg-slate-900 border border-indigo-500/60 p-2 rounded-lg text-sm text-indigo-300 font-bold bg-indigo-950/30">
+                                </div>
+
+                                <div>
+                                    <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Cliente *</label>
+                                    <input type="text" id="campoNotaCliente" placeholder="Nome Completo do Cliente" required class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm text-white">
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">CPF / CNPJ</label>
+                                        <input type="text" id="campoNotaCpfCnpj" placeholder="Opcional" class="w-full bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm text-white">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Telefone / WhatsApp</label>
+                                        <input type="text" id="campoNotaTelefone" placeholder="(00) 00000-0000" class="w-full bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm text-white">
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Nº Pedido</label>
+                                        <input type="text" id="campoNotaNumeroPedido" placeholder="Nº Pedido" class="w-full bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm text-white">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Nº NF / Documento</label>
+                                        <input type="text" id="campoNotaNumeroDocumento" placeholder="Nº Nota / Doc" class="w-full bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm text-white">
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Valor Original *</label>
+                                    <input type="text" id="campoNotaValorOriginal" placeholder="R$ 0,00" required class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm font-bold text-emerald-400">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Observação / Referência</label>
+                                    <textarea id="campoNotaObservacao" rows="2" placeholder="Detalhes da compra ou itens..." class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm text-white"></textarea>
+                                </div>
+
+                                <button type="submit" id="btnSalvarNotaPrazo" class="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white py-4 rounded-xl font-bold text-sm shadow-lg shadow-indigo-600/30 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    SALVAR NOTA A PRAZO
+                                </button>
+                            </form>
+                        </section>
+                    </div>
+
+                    <!-- DASHBOARD E TABELA DE NOTAS A PRAZO -->
+                    <div class="lg:col-span-8 space-y-4">
+                        <!-- CARDS DE STATUS / DASHBOARD -->
+                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                            <div onclick="definirFiltroNotasPrazo('ABERTA')" id="cardNotaAberta" class="bg-slate-800 p-3 rounded-2xl border border-slate-700 shadow-md cursor-pointer transition-all duration-200 hover:border-blue-500 select-none border-2">
+                                <div class="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Abertas</div>
+                                <div id="somaNotasAbertas" class="text-sm sm:text-base font-extrabold text-blue-400 mt-1">R$ 0,00</div>
+                                <div id="qtdNotasAbertas" class="text-[10px] text-slate-500 mt-0.5">0 notas</div>
+                            </div>
+
+                            <div onclick="definirFiltroNotasPrazo('PARCIAL')" id="cardNotaParcial" class="bg-slate-800 p-3 rounded-2xl border border-slate-700 shadow-md cursor-pointer transition-all duration-200 hover:border-amber-500 select-none border-2">
+                                <div class="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Parciais</div>
+                                <div id="somaNotasParciais" class="text-sm sm:text-base font-extrabold text-amber-400 mt-1">R$ 0,00</div>
+                                <div id="qtdNotasParciais" class="text-[10px] text-slate-500 mt-0.5">0 notas</div>
+                            </div>
+
+                            <div onclick="definirFiltroNotasPrazo('VENCENDO')" id="cardNotaVencendo" class="bg-slate-800 p-3 rounded-2xl border border-slate-700 shadow-md cursor-pointer transition-all duration-200 hover:border-yellow-500 select-none border-2">
+                                <div class="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Vencendo</div>
+                                <div id="somaNotasVencendo" class="text-sm sm:text-base font-extrabold text-yellow-400 mt-1">R$ 0,00</div>
+                                <div id="qtdNotasVencendo" class="text-[10px] text-slate-500 mt-0.5">0 notas</div>
+                            </div>
+
+                            <div onclick="definirFiltroNotasPrazo('VENCIDA')" id="cardNotaVencida" class="bg-slate-800 p-3 rounded-2xl border border-slate-700 shadow-md cursor-pointer transition-all duration-200 hover:border-red-500 select-none border-2">
+                                <div class="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Vencidas</div>
+                                <div id="somaNotasVencidas" class="text-sm sm:text-base font-extrabold text-red-400 mt-1">R$ 0,00</div>
+                                <div id="qtdNotasVencidas" class="text-[10px] text-slate-500 mt-0.5">0 notas</div>
+                            </div>
+
+                            <div onclick="definirFiltroNotasPrazo('QUITADA')" id="cardNotaQuitada" class="bg-slate-800 p-3 rounded-2xl border border-slate-700 shadow-md cursor-pointer transition-all duration-200 hover:border-emerald-500 select-none border-2">
+                                <div class="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Quitadas</div>
+                                <div id="somaNotasQuitadas" class="text-sm sm:text-base font-extrabold text-emerald-400 mt-1">R$ 0,00</div>
+                                <div id="qtdNotasQuitadas" class="text-[10px] text-slate-500 mt-0.5">0 notas</div>
+                            </div>
+
+                            <div onclick="definirFiltroNotasPrazo('RECEBIDO_HOJE')" id="cardNotaHoje" class="bg-slate-800 p-3 rounded-2xl border border-slate-700 shadow-md cursor-pointer transition-all duration-200 hover:border-purple-500 select-none border-2">
+                                <div class="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Recebido Hoje</div>
+                                <div id="somaNotasHoje" class="text-sm sm:text-base font-extrabold text-purple-400 mt-1">R$ 0,00</div>
+                                <div id="qtdNotasHoje" class="text-[10px] text-slate-500 mt-0.5">0 pagtos</div>
+                            </div>
+                        </div>
+
+                        <!-- TOTALIZADOR GERAL -->
+                        <div class="bg-slate-800/40 border border-slate-700/60 rounded-xl p-3 flex flex-wrap justify-between items-center text-xs gap-3 shadow-inner">
+                            <div class="text-slate-300">Total a Receber (Saldo Pendente): <span id="balancoNotasPendenteTotal" class="font-bold text-amber-400 ml-1">R$ 0,00</span></div>
+                            <div class="text-slate-300">Total Já Recebido: <span id="balancoNotasRecebidoTotal" class="font-bold text-emerald-400 ml-1">R$ 0,00</span></div>
+                            <div class="text-slate-300">Total Emitido em Notas: <span id="balancoNotasEmitidoTotal" class="font-bold text-blue-400 ml-1">R$ 0,00</span></div>
+                        </div>
+
+                        <!-- BUSCA E FILTROS RÁPIDOS -->
+                        <div class="flex flex-col sm:flex-row gap-2">
+                            <input type="text" id="inputFiltroBuscaNotasPrazo" oninput="atualizarTabelaNotasPrazo()" placeholder="🔍 Pesquisar por cliente, NP-..., pedido, documento ou telefone..." class="flex-1 bg-slate-800 border border-slate-700 px-5 py-3.5 rounded-2xl text-white outline-none">
+                            
+                            <div class="flex gap-1.5 flex-wrap items-center">
+                                <button onclick="definirFiltroNotasPrazo('todas')" id="filtroPillTodas" class="px-3 py-2 rounded-xl text-xs font-bold transition bg-blue-600 text-white">Todas</button>
+                                <button onclick="definirFiltroNotasPrazo('pendentes')" id="filtroPillPendentes" class="px-3 py-2 rounded-xl text-xs font-bold transition bg-slate-800 hover:bg-slate-700 text-slate-300">Pendentes</button>
+                                <button onclick="definirFiltroNotasPrazo('CANCELADA')" id="filtroPillCanceladas" class="px-3 py-2 rounded-xl text-xs font-bold transition bg-slate-800 hover:bg-slate-700 text-slate-300">Canceladas</button>
+                            </div>
+                        </div>
+                        
+                        <!-- TABELA DE NOTAS A PRAZO -->
+                        <div class="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden shadow-2xl">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left">
+                                    <thead class="bg-slate-900/50 text-[10px] uppercase font-bold text-slate-400">
+                                        <tr>
+                                            <th class="p-3.5">Nº Controle</th>
+                                            <th>Cliente</th>
+                                            <th>Vencimento</th>
+                                            <th>Valor Original</th>
+                                            <th>Saldo Devedor</th>
+                                            <th>Status</th>
+                                            <th class="text-right p-3.5">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tabelaCorpoNotasPrazo" class="text-sm divide-y divide-slate-700/50"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div><!-- FIM ABA 2: NOTAS A PRAZO -->
         </main>
     </div>
+
 
     <!-- MODAL PAINEL DE CONTROLE / AUDITORIA -->
     <div id="modalPainelControle" class="fixed inset-0 bg-slate-950/98 backdrop-blur-md hidden z-[60] flex items-center justify-center p-4 no-print">
@@ -279,7 +486,136 @@
         </div>
     </div>
 
-    <!-- ÁREA DE IMPRESSÃO (MEIA FOLHA A4) -->
+    <!-- MODAL REALIZAR BAIXA / PAGAMENTO EM NOTA A PRAZO -->
+    <div id="modalBaixaNotaPrazo" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm hidden z-[75] flex items-center justify-center p-4 no-print">
+        <div class="bg-slate-800 w-full max-w-lg rounded-3xl border border-slate-700 shadow-2xl p-6 sm:p-8">
+            <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-700">
+                <div>
+                    <h3 class="font-bold text-xl text-white flex items-center gap-2">
+                        <span>💵</span> Registrar Pagamento
+                    </h3>
+                    <p id="textoNotaBaixaIdentificacao" class="text-xs text-slate-400 mt-0.5"></p>
+                </div>
+                <button onclick="fecharModalBaixaNota()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1.5 rounded-xl text-xs font-bold transition">✕ Fechar</button>
+            </div>
+
+            <div class="bg-slate-900/60 p-4 rounded-2xl border border-slate-700/70 mb-5 grid grid-cols-2 gap-3 text-center">
+                <div>
+                    <div class="text-[10px] uppercase font-bold text-slate-400">Valor Original</div>
+                    <div id="textoNotaBaixaValorOriginal" class="text-base font-bold text-slate-200 mt-0.5">R$ 0,00</div>
+                </div>
+                <div>
+                    <div class="text-[10px] uppercase font-bold text-slate-400">Saldo Restante</div>
+                    <div id="textoNotaBaixaSaldoAtual" class="text-base font-extrabold text-amber-400 mt-0.5">R$ 0,00</div>
+                </div>
+            </div>
+
+            <input type="hidden" id="idNotaPrazoSendoBaixada">
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1">Valor do Pagamento (R$) *</label>
+                    <input type="text" id="campoBaixaNotaValor" required class="w-full bg-slate-900 border border-slate-700 p-3.5 rounded-xl text-2xl font-black text-emerald-400 text-center outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Data do Pagamento *</label>
+                        <input type="date" id="campoBaixaNotaData" required class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl text-sm text-white outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Forma de Pagamento *</label>
+                        <select id="campoBaixaNotaForma" required class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl text-sm text-white outline-none">
+                            <option value="Dinheiro">Dinheiro</option>
+                            <option value="PIX">PIX</option>
+                            <option value="Cartão de Débito">Cartão de Débito</option>
+                            <option value="Cartão de Crédito">Cartão de Crédito</option>
+                            <option value="Transferência">Transferência</option>
+                            <option value="Boleto">Boleto</option>
+                            <option value="Outro">Outro</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1">Observação do Pagamento</label>
+                    <input type="text" id="campoBaixaNotaObs" placeholder="Ex: Pago na loja, recibo balcão..." class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl text-sm text-white outline-none">
+                </div>
+            </div>
+
+            <div class="flex gap-3 mt-6">
+                <button onclick="fecharModalBaixaNota()" class="flex-1 bg-slate-700 hover:bg-slate-600 py-3.5 rounded-2xl font-bold text-sm transition">Cancelar</button>
+                <button id="btnConfirmarBaixaNota" onclick="confirmarProcessoDeBaixaNota()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 py-3.5 rounded-2xl font-bold text-sm transition shadow-lg shadow-emerald-600/30">Confirmar Baixa</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE EXTRATO E HISTÓRICO DE NOTA A PRAZO -->
+    <div id="modalExtratoNotaPrazo" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm hidden z-[75] flex items-center justify-center p-4 no-print">
+        <div class="bg-slate-800 w-full max-w-3xl rounded-3xl border border-slate-700 shadow-2xl p-6 flex flex-col max-h-[92vh]">
+            <div class="flex justify-between items-start border-b border-slate-700 pb-4">
+                <div>
+                    <h3 class="font-bold text-xl text-white flex items-center gap-2">
+                        📋 Extrato da Nota a Prazo <span id="extratoNotaNumeroControle" class="text-indigo-400 font-mono"></span>
+                    </h3>
+                    <p id="extratoNotaCliente" class="text-slate-300 text-sm mt-1"></p>
+                </div>
+                <button onclick="fecharModalExtratoNota()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white px-3 py-1.5 rounded-xl text-xs font-bold transition">✕ Fechar</button>
+            </div>
+
+            <!-- Dados Resumidos -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4">
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700/60">
+                    <div class="text-[10px] uppercase font-bold text-slate-400">Emissão</div>
+                    <div id="extratoNotaDataEmissao" class="text-sm font-semibold text-slate-200 mt-0.5">-</div>
+                </div>
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700/60">
+                    <div class="text-[10px] uppercase font-bold text-slate-400">Vencimento</div>
+                    <div id="extratoNotaDataVencimento" class="text-sm font-semibold text-slate-200 mt-0.5">-</div>
+                </div>
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700/60">
+                    <div class="text-[10px] uppercase font-bold text-slate-400">Valor Original</div>
+                    <div id="extratoNotaValorOriginal" class="text-sm font-bold text-blue-400 mt-0.5">R$ 0,00</div>
+                </div>
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700/60">
+                    <div class="text-[10px] uppercase font-bold text-slate-400">Saldo Devedor</div>
+                    <div id="extratoNotaSaldoAtual" class="text-sm font-bold text-amber-400 mt-0.5">R$ 0,00</div>
+                </div>
+            </div>
+
+            <!-- Detalhes complementares -->
+            <div id="extratoNotaInfoComplementar" class="text-xs text-slate-400 bg-slate-900/40 p-3 rounded-xl border border-slate-700/40 mb-4 space-y-1"></div>
+
+            <!-- Tabela de Pagamentos -->
+            <div class="flex-1 overflow-auto custom-scrollbar border border-slate-700/60 rounded-xl bg-slate-900/40 min-h-[160px]">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-900/80 text-[10px] uppercase font-bold text-slate-400 sticky top-0">
+                        <tr>
+                            <th class="p-3">Recibo</th>
+                            <th class="p-3">Data</th>
+                            <th class="p-3">Forma</th>
+                            <th class="p-3 text-right">Valor</th>
+                            <th class="p-3 text-center">Status</th>
+                            <th class="p-3 text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="extratoNotaCorpoPagamentos" class="divide-y divide-slate-800 text-xs"></tbody>
+                </table>
+            </div>
+
+            <!-- Rodapé com Ações -->
+            <div class="flex justify-between items-center mt-4 pt-3 border-t border-slate-700 flex-wrap gap-2">
+                <div id="extratoNotaStatusBadge" class="text-xs font-bold"></div>
+                <div class="flex gap-2 flex-wrap">
+                    <button id="btnImprimirNotaA4" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl text-xs font-bold text-white transition flex items-center gap-1.5">🖨️ Imprimir Nota (A4)</button>
+                    <button id="btnBaixarPeloExtrato" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl text-xs font-bold text-white transition flex items-center gap-1.5">💵 Novo Pagamento</button>
+                    <button onclick="fecharModalExtratoNota()" class="bg-indigo-600 hover:bg-indigo-700 px-5 py-2 rounded-xl text-xs font-bold text-white transition">Concluir</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ÁREA DE IMPRESSÃO (MEIA FOLHA A4 / A4 PORTRAIT) -->
     <div id="areaImpressaoFinal" class="print-only"></div>
 
     <!-- CARREGAMENTO SEGURO DE CONFIGURAÇÃO (LOCAL / PRODUÇÃO) -->
@@ -327,6 +663,14 @@
         let valesMap = {}; 
         let filtroStatusAtual = 'todos'; 
         let valesRefGlobal = null; 
+
+        // ==========================================
+        // ESTADO INDEPENDENTE - NOTAS A PRAZO
+        // ==========================================
+        let listaGlobalNotasPrazo = [];
+        let notasPrazoMap = {};
+        let filtroStatusNotasPrazo = 'todas';
+        let notasPrazoRefGlobal = null;
         
         const formatadorMoeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -407,6 +751,7 @@
                 document.getElementById('telaLogin').classList.add('hidden');
                 document.getElementById('conteudoSistema').classList.remove('hidden');
                 
+                // 1. LISTENER DE VALES (TOTALMENTE PRESERVADO)
                 if (valesRefGlobal) valesRefGlobal.off();
                 valesRefGlobal = database.ref('vales');
                 
@@ -429,11 +774,45 @@
                     atualizarTabelaPrincipal();
                     if (!document.getElementById('modalPainelControle').classList.contains('hidden')) renderPainel();
                 });
+
+                // 2. LISTENER DE NOTAS A PRAZO (TOTALMENTE SEPARADO)
+                if (notasPrazoRefGlobal) notasPrazoRefGlobal.off();
+                notasPrazoRefGlobal = database.ref('notasPrazo');
+
+                notasPrazoRefGlobal.on('child_added', (snap) => {
+                    notasPrazoMap[snap.key] = { id: snap.key, ...snap.val() };
+                    listaGlobalNotasPrazo = Object.values(notasPrazoMap);
+                    atualizarTabelaNotasPrazo();
+                    atualizarDashboardNotasPrazo();
+                });
+
+                notasPrazoRefGlobal.on('child_changed', (snap) => {
+                    notasPrazoMap[snap.key] = { id: snap.key, ...snap.val() };
+                    listaGlobalNotasPrazo = Object.values(notasPrazoMap);
+                    atualizarTabelaNotasPrazo();
+                    atualizarDashboardNotasPrazo();
+                    if (!document.getElementById('modalExtratoNotaPrazo').classList.contains('hidden')) {
+                        const idAberto = document.getElementById('extratoNotaNumeroControle')?.dataset?.notaId;
+                        if (idAberto === snap.key) {
+                            atualizarConteudoModalExtrato(snap.key);
+                        }
+                    }
+                });
+
+                notasPrazoRefGlobal.on('child_removed', (snap) => {
+                    delete notasPrazoMap[snap.key];
+                    listaGlobalNotasPrazo = Object.values(notasPrazoMap);
+                    atualizarTabelaNotasPrazo();
+                    atualizarDashboardNotasPrazo();
+                });
                 
             } else {
                 document.getElementById('telaLogin').classList.remove('hidden');
                 document.getElementById('conteudoSistema').classList.add('hidden');
                 if (valesRefGlobal) { valesRefGlobal.off(); valesRefGlobal = null; }
+                if (notasPrazoRefGlobal) { notasPrazoRefGlobal.off(); notasPrazoRefGlobal = null; }
+                notasPrazoMap = {};
+                listaGlobalNotasPrazo = [];
             }
         });
 
@@ -444,6 +823,8 @@
         // ==========================================
         const mValor = IMask(document.getElementById('campoValorOriginal'), { mask: 'R$ num', blocks: { num: { mask: Number, thousandsSeparator: '.', padFractionalZeros: true, radix: ',', mapToRadix: ['.'] } } });
         const mBaixa = IMask(document.getElementById('campoValorBaixa'), { mask: 'R$ num', blocks: { num: { mask: Number, thousandsSeparator: '.', padFractionalZeros: true, radix: ',', mapToRadix: ['.'] } } });
+        const mNotaValorOriginal = IMask(document.getElementById('campoNotaValorOriginal'), { mask: 'R$ num', blocks: { num: { mask: Number, thousandsSeparator: '.', padFractionalZeros: true, radix: ',', mapToRadix: ['.'] } } });
+        const mNotaBaixaValor = IMask(document.getElementById('campoBaixaNotaValor'), { mask: 'R$ num', blocks: { num: { mask: Number, thousandsSeparator: '.', padFractionalZeros: true, radix: ',', mapToRadix: ['.'] } } });
 
         function toF(t) { return parseFloat(t.replace('R$', '').replace(/\./g, '').replace(',', '.')) || 0; }
         function fD(d) { if(!d) return '-'; const [y,m,d_] = d.split('-'); return `${d_}/${m}/${y}`; }
@@ -847,10 +1228,17 @@
         // ==========================================
         async function gerarBackupDadosJSON() {
             if (await validarSenhaMaster()) {
-                const blob = new Blob([JSON.stringify(listaGlobalVales, null, 2)], { type: 'application/json' });
+                const payload = {
+                    schemaVersion: 2,
+                    app: "Tucano Cloud",
+                    exportedAt: new Date().toISOString(),
+                    vales: listaGlobalVales,
+                    notasPrazo: listaGlobalNotasPrazo
+                };
+                const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
-                link.download = `BACKUP_TUCANO_${new Date().toISOString().split('T')[0]}.json`;
+                link.download = `BACKUP_TUCANO_COMPLETO_${new Date().toISOString().split('T')[0]}.json`;
                 link.click();
             } else {
                 Swal.fire('Erro', 'Senha incorreta.', 'error');
@@ -866,11 +1254,48 @@
             reader.onload = async (evento) => {
                 try {
                     const dados = JSON.parse(evento.target.result);
-                    Swal.fire({ title: 'Processando...', text: 'Importando registros...', didOpen: () => Swal.showLoading() });
-                    for(let item of dados) await database.ref('vales/' + item.id).set(item);
-                    Swal.fire('Sucesso!', 'Dados sincronizados.', 'success');
+                    Swal.fire({ title: 'Processando...', text: 'Sincronizando registros...', didOpen: () => Swal.showLoading() });
+                    
+                    let qtdValesImportados = 0;
+                    let qtdNotasImportadas = 0;
+
+                    // Reconhecimento do Formato Antigo Legado (Array direto de Vales)
+                    if (Array.isArray(dados)) {
+                        for (let item of dados) {
+                            if (item && item.id) {
+                                await database.ref('vales/' + item.id).set(item);
+                                qtdValesImportados++;
+                            }
+                        }
+                        Swal.fire('Sucesso!', `Backup legado importado com sucesso: ${qtdValesImportados} vales sincronizados. Dados existentes preservados.`, 'success');
+                        return;
+                    }
+
+                    // Formato Schema Version 2 ou com propriedades explícitas (Merge Seguro)
+                    if (dados && typeof dados === 'object') {
+                        if (Array.isArray(dados.vales)) {
+                            for (let item of dados.vales) {
+                                if (item && item.id) {
+                                    await database.ref('vales/' + item.id).set(item);
+                                    qtdValesImportados++;
+                                }
+                            }
+                        }
+                        if (Array.isArray(dados.notasPrazo)) {
+                            for (let item of dados.notasPrazo) {
+                                if (item && item.id) {
+                                    await database.ref('notasPrazo/' + item.id).set(item);
+                                    qtdNotasImportadas++;
+                                }
+                            }
+                        }
+                        Swal.fire('Sucesso!', `Backup v2 importado: ${qtdValesImportados} vales e ${qtdNotasImportadas} notas a prazo sincronizados com segurança.`, 'success');
+                    } else {
+                        Swal.fire('Erro', 'Formato de arquivo JSON não reconhecido.', 'error');
+                    }
                 } catch (err) {
-                    Swal.fire('Erro', 'Arquivo inválido.', 'error');
+                    console.error(err);
+                    Swal.fire('Erro', 'Arquivo inválido ou corrompido.', 'error');
                 }
             };
             reader.readAsText(e.target.files[0]);
@@ -954,8 +1379,1018 @@
             val.setMonth(val.getMonth() + 3); 
             document.getElementById('campoDataValidade').valueAsDate = val; 
         }
+
+        // =========================================================================
+        // 13. MÓDULO NOTAS A PRAZO / CONTAS A RECEBER (INDEPENDENTE E MODULAR)
+        // =========================================================================
+
+        function alternarAbaPrincipal(aba) {
+            const btnVales = document.getElementById('btnAbaVales');
+            const btnNotas = document.getElementById('btnAbaNotasPrazo');
+            const abaVales = document.getElementById('abaConteudoVales');
+            const abaNotas = document.getElementById('abaConteudoNotasPrazo');
+            const badgeModulo = document.getElementById('badgeModuloAtivo');
+
+            if (aba === 'vales') {
+                abaVales.classList.remove('hidden');
+                abaNotas.classList.add('hidden');
+                btnVales.className = 'px-5 py-2.5 rounded-xl font-bold text-xs transition-all duration-200 flex items-center gap-2 bg-blue-600 text-white shadow-lg shadow-blue-600/30';
+                btnNotas.className = 'px-5 py-2.5 rounded-xl font-bold text-xs transition-all duration-200 flex items-center gap-2 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white';
+                badgeModulo.innerText = 'Vales de Crédito';
+                badgeModulo.className = 'font-bold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-full border border-blue-500/20';
+                atualizarTabelaPrincipal();
+            } else {
+                abaVales.classList.add('hidden');
+                abaNotas.classList.remove('hidden');
+                btnNotas.className = 'px-5 py-2.5 rounded-xl font-bold text-xs transition-all duration-200 flex items-center gap-2 bg-indigo-600 text-white shadow-lg shadow-indigo-600/30';
+                btnVales.className = 'px-5 py-2.5 rounded-xl font-bold text-xs transition-all duration-200 flex items-center gap-2 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white';
+                badgeModulo.innerText = 'Notas a Prazo';
+                badgeModulo.className = 'font-bold text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-full border border-indigo-500/20';
+                atualizarDashboardNotasPrazo();
+                atualizarTabelaNotasPrazo();
+            }
+        }
+
+        function calcularDataVencimento(dataEmissaoStr, dias = 30) {
+            if (!dataEmissaoStr) return '';
+            const [ano, mes, dia] = dataEmissaoStr.split('-').map(Number);
+            const data = new Date(ano, mes - 1, dia);
+            data.setDate(data.getDate() + parseInt(dias || 30, 10));
+            const y = data.getFullYear();
+            const m = String(data.getMonth() + 1).padStart(2, '0');
+            const d = String(data.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function aoMudarDataOuPrazoNota() {
+            const emissao = document.getElementById('campoNotaDataEmissao').value;
+            const prazo = parseInt(document.getElementById('campoNotaPrazoDias').value, 10) || 30;
+            if (emissao) {
+                document.getElementById('campoNotaDataVencimento').value = calcularDataVencimento(emissao, prazo);
+            }
+        }
+
+        function resetDatasNotaPrazo() {
+            const cEmissao = document.getElementById('campoNotaDataEmissao');
+            const cPrazo = document.getElementById('campoNotaPrazoDias');
+            const cVencimento = document.getElementById('campoNotaDataVencimento');
+            if (cEmissao && cPrazo && cVencimento) {
+                cEmissao.valueAsDate = new Date();
+                cPrazo.value = 30;
+                cVencimento.value = calcularDataVencimento(cEmissao.value, 30);
+            }
+        }
+
+        function gerarNumeroControleNota() {
+            const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+            let codigo = '';
+            for (let i = 0; i < 8; i++) {
+                codigo += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return `NP-${codigo}`;
+        }
+
+        function gerarNumeroRecibo() {
+            const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+            let codigo = '';
+            for (let i = 0; i < 8; i++) {
+                codigo += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return `REC-${codigo}`;
+        }
+
+        function extrairPagamentosNota(nota) {
+            if (!nota || !nota.pagamentos) return [];
+            if (Array.isArray(nota.pagamentos)) return nota.pagamentos;
+            return Object.keys(nota.pagamentos).map(k => ({
+                id: k,
+                ...nota.pagamentos[k]
+            }));
+        }
+
+        function calcularSaldoNota(nota) {
+            const valorOrig = parseFloat(nota.valorOriginal) || 0;
+            const pagamentos = extrairPagamentosNota(nota);
+            const totalPagoAtivo = pagamentos
+                .filter(p => p.status !== 'ESTORNADO')
+                .reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0);
+            const saldo = Math.max(0, valorOrig - totalPagoAtivo);
+            return Math.round(saldo * 100) / 100;
+        }
+
+        function calcularTotalPagoNota(nota) {
+            const pagamentos = extrairPagamentosNota(nota);
+            const totalPagoAtivo = pagamentos
+                .filter(p => p.status !== 'ESTORNADO')
+                .reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0);
+            return Math.round(totalPagoAtivo * 100) / 100;
+        }
+
+        function obterStatusNota(nota) {
+            if (nota.status === 'CANCELADA' || nota.statusCancelamento === 'CANCELADA') {
+                return 'CANCELADA';
+            }
+            const saldo = calcularSaldoNota(nota);
+            const valorOrig = parseFloat(nota.valorOriginal) || 0;
+            const pagamentosAtivos = extrairPagamentosNota(nota).filter(p => p.status !== 'ESTORNADO');
+            const totalPago = pagamentosAtivos.reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0);
+
+            if (saldo <= 0 && valorOrig > 0) {
+                return 'QUITADA';
+            }
+
+            const hoje = new Date().toISOString().split('T')[0];
+            const vencimento = nota.dataVencimento || '';
+
+            if (vencimento && vencimento < hoje) {
+                return 'VENCIDA';
+            }
+
+            if (vencimento) {
+                const hojeDate = new Date(hoje + 'T00:00:00');
+                const vencDate = new Date(vencimento + 'T00:00:00');
+                const diffDias = Math.ceil((vencDate - hojeDate) / (1000 * 60 * 60 * 24));
+                if (diffDias >= 0 && diffDias <= 3) {
+                    return 'VENCENDO';
+                }
+            }
+
+            if (totalPago > 0) {
+                return 'PARCIAL';
+            }
+
+            return 'ABERTA';
+        }
+
+        document.getElementById('formCadastroNotaPrazo').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const btnSubmit = document.getElementById('btnSalvarNotaPrazo');
+            if (btnSubmit.disabled) return;
+            const textoOriginal = btnSubmit.innerHTML;
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = 'Processando...';
+
+            const valorOrig = toF(mNotaValorOriginal.value);
+            if (valorOrig <= 0) {
+                Swal.fire('Atenção', 'Informe um valor original maior que R$ 0,00.', 'warning');
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = textoOriginal;
+                return;
+            }
+
+            const dataEmissao = document.getElementById('campoNotaDataEmissao').value;
+            const prazoDias = parseInt(document.getElementById('campoNotaPrazoDias').value, 10) || 30;
+            const dataVencimento = document.getElementById('campoNotaDataVencimento').value || calcularDataVencimento(dataEmissao, prazoDias);
+
+            const novaRef = database.ref('notasPrazo').push();
+            const idTecnico = novaRef.key;
+            const numeroControle = gerarNumeroControleNota();
+            const operadorAtual = (auth.currentUser && auth.currentUser.email) ? auth.currentUser.email : 'Operador';
+
+            const dadosNota = {
+                id: idTecnico,
+                numeroControle: numeroControle,
+                tipo: 'NOTA_A_PRAZO',
+                cliente: document.getElementById('campoNotaCliente').value.trim(),
+                cpfCnpj: document.getElementById('campoNotaCpfCnpj').value.trim(),
+                telefone: document.getElementById('campoNotaTelefone').value.trim(),
+                numeroPedido: document.getElementById('campoNotaNumeroPedido').value.trim(),
+                numeroDocumento: document.getElementById('campoNotaNumeroDocumento').value.trim(),
+                dataEmissao: dataEmissao,
+                prazoDias: prazoDias,
+                dataVencimento: dataVencimento,
+                valorOriginal: valorOrig,
+                observacao: document.getElementById('campoNotaObservacao').value.trim(),
+                criadoEm: new Date().toISOString(),
+                criadoPor: operadorAtual,
+                atualizadoEm: new Date().toISOString(),
+                atualizadoPor: operadorAtual,
+                status: 'ABERTA',
+                pagamentos: {}
+            };
+
+            try {
+                await novaRef.set(dadosNota);
+                this.reset();
+                resetDatasNotaPrazo();
+                const escolha = await Swal.fire({
+                    title: 'Nota Salva com Sucesso!',
+                    html: `Nota <strong>${numeroControle}</strong> registrada.<br>Vencimento: <strong>${fD(dataVencimento)}</strong>.<br><br>Deseja imprimir o comprovante em A4 agora?`,
+                    icon: 'success',
+                    showCancelButton: true,
+                    confirmButtonText: '🖨️ Imprimir A4',
+                    cancelButtonText: 'Concluir'
+                });
+                if (escolha.isConfirmed) {
+                    imprimirNotaPrazoA4(idTecnico);
+                }
+            } catch (erro) {
+                console.error(erro);
+                Swal.fire('Erro', 'Falha ao salvar nota a prazo. Verifique a conexão.', 'error');
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = textoOriginal;
+            }
+        });
+
+        function definirFiltroNotasPrazo(filtro) {
+            filtroStatusNotasPrazo = (filtroStatusNotasPrazo === filtro) ? 'todas' : filtro;
+            atualizarDashboardNotasPrazo();
+            atualizarTabelaNotasPrazo();
+        }
+
+        function atualizarDashboardNotasPrazo() {
+            let sAbertas = 0, qAbertas = 0;
+            let sParciais = 0, qParciais = 0;
+            let sVencendo = 0, qVencendo = 0;
+            let sVencidas = 0, qVencidas = 0;
+            let sQuitadas = 0, qQuitadas = 0;
+            let sHoje = 0, qHoje = 0;
+
+            let totalPendenteGeral = 0;
+            let totalRecebidoGeral = 0;
+            let totalEmitidoGeral = 0;
+
+            const hojeStr = new Date().toISOString().split('T')[0];
+
+            listaGlobalNotasPrazo.forEach(nota => {
+                const status = obterStatusNota(nota);
+                const saldo = calcularSaldoNota(nota);
+                const totalPago = calcularTotalPagoNota(nota);
+                const valorOrig = parseFloat(nota.valorOriginal) || 0;
+
+                totalEmitidoGeral += valorOrig;
+                totalRecebidoGeral += totalPago;
+                if (status !== 'CANCELADA') {
+                    totalPendenteGeral += saldo;
+                }
+
+                if (status === 'ABERTA') {
+                    sAbertas += saldo;
+                    qAbertas++;
+                } else if (status === 'PARCIAL') {
+                    sParciais += saldo;
+                    qParciais++;
+                } else if (status === 'VENCENDO') {
+                    sVencendo += saldo;
+                    qVencendo++;
+                } else if (status === 'VENCIDA') {
+                    sVencidas += saldo;
+                    qVencidas++;
+                } else if (status === 'QUITADA') {
+                    sQuitadas += valorOrig;
+                    qQuitadas++;
+                }
+
+                const pagtos = extrairPagamentosNota(nota);
+                pagtos.forEach(p => {
+                    if (p.status !== 'ESTORNADO') {
+                        const dataP = (p.dataPagamento || '').split('T')[0];
+                        if (dataP === hojeStr) {
+                            sHoje += (parseFloat(p.valor) || 0);
+                            qHoje++;
+                        }
+                    }
+                });
+            });
+
+            document.getElementById('somaNotasAbertas').innerText = formatadorMoeda.format(sAbertas);
+            document.getElementById('qtdNotasAbertas').innerText = `${qAbertas} nota(s)`;
+            document.getElementById('somaNotasParciais').innerText = formatadorMoeda.format(sParciais);
+            document.getElementById('qtdNotasParciais').innerText = `${qParciais} nota(s)`;
+            document.getElementById('somaNotasVencendo').innerText = formatadorMoeda.format(sVencendo);
+            document.getElementById('qtdNotasVencendo').innerText = `${qVencendo} nota(s)`;
+            document.getElementById('somaNotasVencidas').innerText = formatadorMoeda.format(sVencidas);
+            document.getElementById('qtdNotasVencidas').innerText = `${qVencidas} nota(s)`;
+            document.getElementById('somaNotasQuitadas').innerText = formatadorMoeda.format(sQuitadas);
+            document.getElementById('qtdNotasQuitadas').innerText = `${qQuitadas} nota(s)`;
+            document.getElementById('somaNotasHoje').innerText = formatadorMoeda.format(sHoje);
+            document.getElementById('qtdNotasHoje').innerText = `${qHoje} pagto(s)`;
+
+            document.getElementById('balancoNotasPendenteTotal').innerText = formatadorMoeda.format(totalPendenteGeral);
+            document.getElementById('balancoNotasRecebidoTotal').innerText = formatadorMoeda.format(totalRecebidoGeral);
+            document.getElementById('balancoNotasEmitidoTotal').innerText = formatadorMoeda.format(totalEmitidoGeral);
+
+            const cards = {
+                'ABERTA': { id: 'cardNotaAberta', cor: 'border-blue-500' },
+                'PARCIAL': { id: 'cardNotaParcial', cor: 'border-amber-500' },
+                'VENCENDO': { id: 'cardNotaVencendo', cor: 'border-yellow-500' },
+                'VENCIDA': { id: 'cardNotaVencida', cor: 'border-red-500' },
+                'QUITADA': { id: 'cardNotaQuitada', cor: 'border-emerald-500' },
+                'RECEBIDO_HOJE': { id: 'cardNotaHoje', cor: 'border-purple-500' }
+            };
+
+            Object.keys(cards).forEach(chave => {
+                const el = document.getElementById(cards[chave].id);
+                if (el) {
+                    if (filtroStatusNotasPrazo === chave) {
+                        el.className = `bg-slate-800 p-3 rounded-2xl border shadow-md cursor-pointer transition-all duration-200 select-none border-2 ${cards[chave].cor}`;
+                    } else {
+                        el.className = `bg-slate-800 p-3 rounded-2xl border border-slate-700 shadow-md cursor-pointer transition-all duration-200 select-none border-2 hover:${cards[chave].cor}`;
+                    }
+                }
+            });
+
+            const pTodas = document.getElementById('filtroPillTodas');
+            const pPend = document.getElementById('filtroPillPendentes');
+            const pCanc = document.getElementById('filtroPillCanceladas');
+            if (pTodas) pTodas.className = `px-3 py-2 rounded-xl text-xs font-bold transition ${filtroStatusNotasPrazo === 'todas' ? 'bg-blue-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}`;
+            if (pPend) pPend.className = `px-3 py-2 rounded-xl text-xs font-bold transition ${filtroStatusNotasPrazo === 'pendentes' ? 'bg-amber-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}`;
+            if (pCanc) pCanc.className = `px-3 py-2 rounded-xl text-xs font-bold transition ${filtroStatusNotasPrazo === 'CANCELADA' ? 'bg-red-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}`;
+        }
+
+        function atualizarTabelaNotasPrazo() {
+            const busca = (document.getElementById('inputFiltroBuscaNotasPrazo')?.value || '').toLowerCase().trim();
+            const corpo = document.getElementById('tabelaCorpoNotasPrazo');
+            if (!corpo) return;
+            corpo.innerHTML = '';
+
+            const hojeStr = new Date().toISOString().split('T')[0];
+
+            const filtradas = listaGlobalNotasPrazo.filter(nota => {
+                const status = obterStatusNota(nota);
+                const saldo = calcularSaldoNota(nota);
+
+                const textoMatch = 
+                    (nota.cliente || '').toLowerCase().includes(busca) ||
+                    (nota.numeroControle || '').toLowerCase().includes(busca) ||
+                    (nota.numeroPedido || '').toLowerCase().includes(busca) ||
+                    (nota.numeroDocumento || '').toLowerCase().includes(busca) ||
+                    (nota.telefone || '').toLowerCase().includes(busca) ||
+                    (nota.cpfCnpj || '').toLowerCase().includes(busca);
+
+                if (!textoMatch) return false;
+
+                if (filtroStatusNotasPrazo === 'todas') return true;
+                if (filtroStatusNotasPrazo === 'pendentes') return saldo > 0 && status !== 'CANCELADA';
+                if (filtroStatusNotasPrazo === 'RECEBIDO_HOJE') {
+                    const pagtos = extrairPagamentosNota(nota);
+                    return pagtos.some(p => p.status !== 'ESTORNADO' && (p.dataPagamento || '').split('T')[0] === hojeStr);
+                }
+                return status === filtroStatusNotasPrazo;
+            });
+
+            if (filtradas.length === 0) {
+                corpo.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400 italic">Nenhuma nota a prazo encontrada para os filtros atuais.</td></tr>`;
+                return;
+            }
+
+            filtradas.slice().reverse().forEach(nota => {
+                const status = obterStatusNota(nota);
+                const saldo = calcularSaldoNota(nota);
+                const valorOrig = parseFloat(nota.valorOriginal) || 0;
+
+                let badgeHtml = '';
+                switch (status) {
+                    case 'ABERTA':
+                        badgeHtml = `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">ABERTA</span>`;
+                        break;
+                    case 'PARCIAL':
+                        badgeHtml = `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">PARCIAL</span>`;
+                        break;
+                    case 'VENCENDO':
+                        badgeHtml = `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 animate-pulse">VENCENDO</span>`;
+                        break;
+                    case 'VENCIDA':
+                        badgeHtml = `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">VENCIDA</span>`;
+                        break;
+                    case 'QUITADA':
+                        badgeHtml = `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">QUITADA</span>`;
+                        break;
+                    case 'CANCELADA':
+                        badgeHtml = `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-700 text-slate-400 border border-slate-600">CANCELADA</span>`;
+                        break;
+                }
+
+                const pagtos = extrairPagamentosNota(nota).filter(p => p.status !== 'ESTORNADO');
+                const temPagto = pagtos.length > 0;
+                const podeBaixar = saldo > 0 && status !== 'CANCELADA';
+                const podeCancelar = status !== 'CANCELADA' && status !== 'QUITADA';
+
+                corpo.innerHTML += `
+                    <tr class="border-b border-slate-700/30 hover:bg-slate-800/50 transition">
+                        <td class="p-3.5 font-mono text-indigo-400 font-bold">
+                            ${escapeHtml(nota.numeroControle || nota.id)}
+                        </td>
+                        <td class="font-semibold text-slate-100">
+                            <div>${escapeHtml(nota.cliente || 'S/ Nome')}</div>
+                            <div class="text-[11px] text-slate-400 font-normal">
+                                ${nota.telefone ? `📞 ${escapeHtml(nota.telefone)}` : ''}
+                                ${nota.numeroPedido ? ` &nbsp;•&nbsp; Pedido: ${escapeHtml(nota.numeroPedido)}` : ''}
+                            </div>
+                        </td>
+                        <td class="text-xs text-slate-300">
+                            <div class="${(status === 'VENCIDA' || status === 'VENCENDO') ? 'font-bold text-red-400' : ''}">${fD(nota.dataVencimento)}</div>
+                            <div class="text-[10px] text-slate-500">Emissão: ${fD(nota.dataEmissao)}</div>
+                        </td>
+                        <td class="font-bold text-slate-200">
+                            ${formatadorMoeda.format(valorOrig)}
+                        </td>
+                        <td class="font-bold ${saldo > 0 ? (status === 'VENCIDA' ? 'text-red-400' : 'text-amber-400') : 'text-emerald-400'}">
+                            ${formatadorMoeda.format(saldo)}
+                        </td>
+                        <td>${badgeHtml}</td>
+                        <td class="p-3.5 text-right space-x-1 whitespace-nowrap">
+                            <button onclick="abrirModalExtratoNota('${escapeHtml(nota.id)}')" title="Ver Extrato e Histórico" class="p-1.5 rounded hover:bg-slate-700 text-sm transition" aria-label="Extrato">📋</button>
+                            <button onclick="imprimirNotaPrazoA4('${escapeHtml(nota.id)}')" title="Imprimir Nota em A4" class="p-1.5 rounded hover:bg-slate-700 text-sm transition" aria-label="Imprimir Nota">🖨️</button>
+                            ${temPagto ? `<button onclick="imprimirUltimoReciboNota('${escapeHtml(nota.id)}')" title="Imprimir Último Recibo A4" class="p-1.5 rounded hover:bg-slate-700 text-sm transition" aria-label="Último Recibo">🧾</button>` : ''}
+                            ${podeBaixar ? `<button onclick="abrirModalBaixaNota('${escapeHtml(nota.id)}')" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1 rounded text-xs font-bold text-white transition shadow">BAIXAR</button>` : ''}
+                            ${podeCancelar ? `<button onclick="solicitarCancelamentoNota('${escapeHtml(nota.id)}')" title="Cancelar Nota" class="p-1.5 rounded hover:bg-red-900/50 text-red-400 text-sm transition" aria-label="Cancelar">🚫</button>` : ''}
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function abrirModalBaixaNota(id) {
+            const nota = listaGlobalNotasPrazo.find(x => String(x.id) === String(id));
+            if (!nota) return;
+            const saldo = calcularSaldoNota(nota);
+            const status = obterStatusNota(nota);
+
+            if (status === 'CANCELADA') {
+                Swal.fire('Bloqueado', 'Esta nota está cancelada e não aceita pagamentos.', 'error');
+                return;
+            }
+            if (saldo <= 0) {
+                Swal.fire('Quitada', 'Esta nota já está 100% quitada.', 'info');
+                return;
+            }
+
+            document.getElementById('idNotaPrazoSendoBaixada').value = id;
+            document.getElementById('textoNotaBaixaIdentificacao').innerText = `Nota: ${nota.numeroControle || nota.id} • Cliente: ${nota.cliente}`;
+            document.getElementById('textoNotaBaixaValorOriginal').innerText = formatadorMoeda.format(parseFloat(nota.valorOriginal) || 0);
+            document.getElementById('textoNotaBaixaSaldoAtual').innerText = formatadorMoeda.format(saldo);
+
+            mNotaBaixaValor.value = saldo.toFixed(2).replace('.', ',');
+            document.getElementById('campoBaixaNotaData').valueAsDate = new Date();
+            document.getElementById('campoBaixaNotaForma').value = 'Dinheiro';
+            document.getElementById('campoBaixaNotaObs').value = '';
+
+            document.getElementById('modalBaixaNotaPrazo').classList.remove('hidden');
+        }
+
+        function fecharModalBaixaNota() {
+            document.getElementById('modalBaixaNotaPrazo').classList.add('hidden');
+        }
+
+        async function confirmarProcessoDeBaixaNota() {
+            const id = document.getElementById('idNotaPrazoSendoBaixada').value;
+            const nota = listaGlobalNotasPrazo.find(x => String(x.id) === String(id));
+            if (!nota) {
+                Swal.fire('Erro', 'Nota a prazo não encontrada.', 'error');
+                return;
+            }
+
+            const status = obterStatusNota(nota);
+            if (status === 'CANCELADA') {
+                Swal.fire('Bloqueado', 'Esta nota está cancelada.', 'error');
+                return;
+            }
+
+            const saldoAtual = calcularSaldoNota(nota);
+            const valorPago = toF(mNotaBaixaValor.value);
+            const dataPagto = document.getElementById('campoBaixaNotaData').value;
+            const formaPagto = document.getElementById('campoBaixaNotaForma').value;
+            const obsPagto = document.getElementById('campoBaixaNotaObs').value.trim();
+
+            if (valorPago <= 0) {
+                Swal.fire('Atenção', 'O valor do pagamento deve ser maior que R$ 0,00.', 'warning');
+                return;
+            }
+            if (valorPago > saldoAtual + 0.001) {
+                Swal.fire('Bloqueado', `Valor do pagamento excede o saldo devedor (${formatadorMoeda.format(saldoAtual)}).`, 'error');
+                return;
+            }
+            if (!dataPagto) {
+                Swal.fire('Atenção', 'Informe a data do pagamento.', 'warning');
+                return;
+            }
+
+            const btnConfirmar = document.getElementById('btnConfirmarBaixaNota');
+            if (btnConfirmar.disabled) return;
+            const textoOriginal = btnConfirmar.innerHTML;
+            btnConfirmar.disabled = true;
+            btnConfirmar.innerHTML = 'Processando...';
+
+            const operadorAtual = (auth.currentUser && auth.currentUser.email) ? auth.currentUser.email : 'Operador';
+            const novoPagtoRef = database.ref(`notasPrazo/${id}/pagamentos`).push();
+            const idPagamento = novoPagtoRef.key;
+            const numeroRecibo = gerarNumeroRecibo();
+
+            const dadosPagamento = {
+                id: idPagamento,
+                numeroRecibo: numeroRecibo,
+                dataPagamento: dataPagto,
+                valor: valorPago,
+                formaPagamento: formaPagto,
+                observacao: obsPagto,
+                status: 'ATIVO',
+                criadoEm: new Date().toISOString(),
+                criadoPor: operadorAtual
+            };
+
+            const novoSaldo = Math.max(0, Math.round((saldoAtual - valorPago) * 100) / 100);
+            const novoStatus = novoSaldo <= 0 ? 'QUITADA' : 'PARCIAL';
+
+            const updates = {};
+            updates[`notasPrazo/${id}/pagamentos/${idPagamento}`] = dadosPagamento;
+            updates[`notasPrazo/${id}/status`] = novoStatus;
+            updates[`notasPrazo/${id}/atualizadoEm`] = new Date().toISOString();
+            updates[`notasPrazo/${id}/atualizadoPor`] = operadorAtual;
+
+            try {
+                await database.ref().update(updates);
+                fecharModalBaixaNota();
+
+                const escolha = await Swal.fire({
+                    title: novoSaldo <= 0 ? '🎉 Nota Quitada!' : 'Pagamento Registrado!',
+                    html: `Recibo <strong>${numeroRecibo}</strong> gerado com sucesso.<br>Saldo restante: <strong>${formatadorMoeda.format(novoSaldo)}</strong>.<br><br>Deseja imprimir o recibo em A4 agora?`,
+                    icon: 'success',
+                    showCancelButton: true,
+                    confirmButtonText: '🖨️ Imprimir Recibo A4',
+                    cancelButtonText: 'Concluir'
+                });
+
+                if (escolha.isConfirmed) {
+                    imprimirReciboPagamentoA4(id, idPagamento);
+                }
+            } catch (err) {
+                console.error(err);
+                Swal.fire('Erro', 'Não foi possível registrar o pagamento no servidor.', 'error');
+            } finally {
+                btnConfirmar.disabled = false;
+                btnConfirmar.innerHTML = textoOriginal;
+            }
+        }
+
+        async function solicitarCancelamentoNota(id) {
+            const nota = listaGlobalNotasPrazo.find(x => String(x.id) === String(id));
+            if (!nota) return;
+
+            if (!await validarSenhaMaster()) {
+                Swal.fire('Bloqueado', 'Senha mestre incorreta. Operação cancelada.', 'error');
+                return;
+            }
+
+            const { value: motivo } = await Swal.fire({
+                title: `Cancelar Nota ${nota.numeroControle || nota.id}?`,
+                input: 'textarea',
+                inputLabel: 'Informe obrigatoriamente o motivo do cancelamento:',
+                inputPlaceholder: 'Motivo detalhado...',
+                inputValidator: (value) => {
+                    if (!value || !value.trim()) {
+                        return 'É necessário informar o motivo para cancelar!';
+                    }
+                },
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Sim, Cancelar Nota',
+                cancelButtonText: 'Voltar'
+            });
+
+            if (motivo) {
+                const operadorAtual = (auth.currentUser && auth.currentUser.email) ? auth.currentUser.email : 'Operador';
+                const updates = {};
+                updates[`notasPrazo/${id}/status`] = 'CANCELADA';
+                updates[`notasPrazo/${id}/canceladaEm`] = new Date().toISOString();
+                updates[`notasPrazo/${id}/canceladaPor`] = operadorAtual;
+                updates[`notasPrazo/${id}/motivoCancelamento`] = motivo.trim();
+                updates[`notasPrazo/${id}/atualizadoEm`] = new Date().toISOString();
+                updates[`notasPrazo/${id}/atualizadoPor`] = operadorAtual;
+
+                try {
+                    await database.ref().update(updates);
+                    Swal.fire('Nota Cancelada', 'A nota foi marcada como cancelada. O histórico foi preservado.', 'success');
+                } catch (err) {
+                    console.error(err);
+                    Swal.fire('Erro', 'Falha ao cancelar a nota no banco.', 'error');
+                }
+            }
+        }
+
+        async function solicitarEstornoPagamento(idNota, idPagamento) {
+            const nota = listaGlobalNotasPrazo.find(x => String(x.id) === String(idNota));
+            if (!nota) return;
+
+            const pagtos = extrairPagamentosNota(nota);
+            const pagto = pagtos.find(p => String(p.id) === String(idPagamento));
+            if (!pagto || pagto.status === 'ESTORNADO') {
+                Swal.fire('Aviso', 'Pagamento já estornado ou não localizado.', 'info');
+                return;
+            }
+
+            if (!await validarSenhaMaster()) {
+                Swal.fire('Bloqueado', 'Senha mestre incorreta. Operação cancelada.', 'error');
+                return;
+            }
+
+            const { value: motivo } = await Swal.fire({
+                title: `Estornar Pagamento ${pagto.numeroRecibo || ''}?`,
+                html: `Valor: <strong>${formatadorMoeda.format(parseFloat(pagto.valor) || 0)}</strong><br>Informe o motivo do estorno:`,
+                input: 'textarea',
+                inputPlaceholder: 'Motivo do estorno...',
+                inputValidator: (value) => {
+                    if (!value || !value.trim()) {
+                        return 'É necessário informar o motivo do estorno!';
+                    }
+                },
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Confirmar Estorno',
+                cancelButtonText: 'Voltar'
+            });
+
+            if (motivo) {
+                const operadorAtual = (auth.currentUser && auth.currentUser.email) ? auth.currentUser.email : 'Operador';
+                
+                const updates = {};
+                updates[`notasPrazo/${idNota}/pagamentos/${idPagamento}/status`] = 'ESTORNADO';
+                updates[`notasPrazo/${idNota}/pagamentos/${idPagamento}/estornadoEm`] = new Date().toISOString();
+                updates[`notasPrazo/${idNota}/pagamentos/${idPagamento}/estornadoPor`] = operadorAtual;
+                updates[`notasPrazo/${idNota}/pagamentos/${idPagamento}/motivoEstorno`] = motivo.trim();
+                
+                const pagtosRestantes = pagtos.filter(p => p.id !== idPagamento && p.status !== 'ESTORNADO');
+                const totalRestante = pagtosRestantes.reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0);
+                const valorOrig = parseFloat(nota.valorOriginal) || 0;
+                const novoSaldo = Math.max(0, valorOrig - totalRestante);
+                
+                let novoStatus = 'ABERTA';
+                if (novoSaldo <= 0) novoStatus = 'QUITADA';
+                else if (totalRestante > 0) novoStatus = 'PARCIAL';
+                
+                updates[`notasPrazo/${idNota}/status`] = novoStatus;
+                updates[`notasPrazo/${idNota}/atualizadoEm`] = new Date().toISOString();
+                updates[`notasPrazo/${idNota}/atualizadoPor`] = operadorAtual;
+
+                try {
+                    await database.ref().update(updates);
+                    Swal.fire('Estorno Realizado', 'O pagamento foi estornado com sucesso. Saldo recalculado.', 'success');
+                } catch (err) {
+                    console.error(err);
+                    Swal.fire('Erro', 'Falha ao estornar pagamento.', 'error');
+                }
+            }
+        }
+
+        function abrirModalExtratoNota(id) {
+            atualizarConteudoModalExtrato(id);
+            document.getElementById('modalExtratoNotaPrazo').classList.remove('hidden');
+        }
+
+        function fecharModalExtratoNota() {
+            document.getElementById('modalExtratoNotaPrazo').classList.add('hidden');
+        }
+
+        function atualizarConteudoModalExtrato(id) {
+            const nota = listaGlobalNotasPrazo.find(x => String(x.id) === String(id));
+            if (!nota) return;
+
+            const saldo = calcularSaldoNota(nota);
+            const totalPago = calcularTotalPagoNota(nota);
+            const valorOrig = parseFloat(nota.valorOriginal) || 0;
+            const status = obterStatusNota(nota);
+
+            const numControleEl = document.getElementById('extratoNotaNumeroControle');
+            numControleEl.innerText = `#${nota.numeroControle || nota.id}`;
+            numControleEl.dataset.notaId = id;
+
+            document.getElementById('extratoNotaCliente').innerHTML = `<strong>Cliente:</strong> ${escapeHtml(nota.cliente || 'S/ Nome')}`;
+            document.getElementById('extratoNotaDataEmissao').innerText = fD(nota.dataEmissao);
+            document.getElementById('extratoNotaDataVencimento').innerText = fD(nota.dataVencimento);
+            document.getElementById('extratoNotaValorOriginal').innerText = formatadorMoeda.format(valorOrig);
+            document.getElementById('extratoNotaSaldoAtual').innerText = formatadorMoeda.format(saldo);
+
+            let infoComp = `
+                <div><strong>Nº Pedido:</strong> ${escapeHtml(nota.numeroPedido || '-')} &nbsp;|&nbsp; <strong>Nº Documento / NF:</strong> ${escapeHtml(nota.numeroDocumento || '-')}</div>
+                <div><strong>CPF/CNPJ:</strong> ${escapeHtml(nota.cpfCnpj || '-')} &nbsp;|&nbsp; <strong>Telefone:</strong> ${escapeHtml(nota.telefone || '-')}</div>
+                <div><strong>Prazo:</strong> ${nota.prazoDias || 30} dias &nbsp;|&nbsp; <strong>Registrado por:</strong> ${escapeHtml(nota.criadoPor || '-')}</div>
+                <div><strong>Observações:</strong> ${escapeHtml(nota.observacao || '-')}</div>
+            `;
+            if (status === 'CANCELADA') {
+                infoComp += `<div class="text-red-400 mt-1"><strong>CANCELADA EM:</strong> ${fD(nota.canceladaEm)} por ${escapeHtml(nota.canceladaPor || '-')} • <strong>Motivo:</strong> ${escapeHtml(nota.motivoCancelamento || '-')}</div>`;
+            }
+            document.getElementById('extratoNotaInfoComplementar').innerHTML = infoComp;
+
+            const badgeEl = document.getElementById('extratoNotaStatusBadge');
+            switch (status) {
+                case 'ABERTA':
+                    badgeEl.innerHTML = `<span class="px-3 py-1 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">ABERTA / TOTAL PENDENTE</span>`;
+                    break;
+                case 'PARCIAL':
+                    badgeEl.innerHTML = `<span class="px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">PARCIALMENTE RECEBIDO</span>`;
+                    break;
+                case 'VENCENDO':
+                    badgeEl.innerHTML = `<span class="px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/40">VENCIMENTO PRÓXIMO</span>`;
+                    break;
+                case 'VENCIDA':
+                    badgeEl.innerHTML = `<span class="px-3 py-1 rounded-full bg-red-500/20 text-red-400 border border-red-500/30">VENCIDA COM SALDO</span>`;
+                    break;
+                case 'QUITADA':
+                    badgeEl.innerHTML = `<span class="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">TOTALMENTE QUITADA</span>`;
+                    break;
+                case 'CANCELADA':
+                    badgeEl.innerHTML = `<span class="px-3 py-1 rounded-full bg-slate-700 text-slate-400 border border-slate-600">CANCELADA</span>`;
+                    break;
+            }
+
+            const corpo = document.getElementById('extratoNotaCorpoPagamentos');
+            corpo.innerHTML = '';
+            const pagtos = extrairPagamentosNota(nota);
+
+            if (pagtos.length === 0) {
+                corpo.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400 italic">Nenhum pagamento registrado até o momento.</td></tr>`;
+            } else {
+                pagtos.forEach((p, idx) => {
+                    const estornado = p.status === 'ESTORNADO';
+                    const vPagto = parseFloat(p.valor) || 0;
+
+                    corpo.innerHTML += `
+                        <tr class="hover:bg-slate-800/60 transition ${estornado ? 'opacity-60 bg-red-950/10' : ''}">
+                            <td class="p-3 font-mono ${estornado ? 'line-through text-slate-500' : 'text-emerald-400 font-bold'}">
+                                ${escapeHtml(p.numeroRecibo || '#' + (idx + 1))}
+                            </td>
+                            <td class="p-3 text-slate-200">${fD(p.dataPagamento)}</td>
+                            <td class="p-3 text-slate-300 font-semibold">${escapeHtml(p.formaPagamento || '-')}</td>
+                            <td class="p-3 text-right font-bold ${estornado ? 'line-through text-slate-500' : 'text-emerald-400'}">
+                                ${formatadorMoeda.format(vPagto)}
+                            </td>
+                            <td class="p-3 text-center">
+                                ${estornado 
+                                    ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-950 text-red-400 border border-red-800" title="Motivo: ${escapeHtml(p.motivoEstorno || '-')}">ESTORNADO</span>`
+                                    : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">ATIVO</span>`
+                                }
+                            </td>
+                            <td class="p-3 text-right space-x-1 whitespace-nowrap">
+                                <button onclick="imprimirReciboPagamentoA4('${escapeHtml(nota.id)}', '${escapeHtml(p.id)}')" title="Imprimir Recibo A4" class="p-1 rounded hover:bg-slate-700 text-xs">🖨️ Recibo</button>
+                                ${!estornado && status !== 'CANCELADA' ? `<button onclick="solicitarEstornoPagamento('${escapeHtml(nota.id)}', '${escapeHtml(p.id)}')" title="Estornar Pagamento" class="p-1 rounded hover:bg-red-900/50 text-red-400 text-xs">↩️ Estornar</button>` : ''}
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+
+            document.getElementById('btnImprimirNotaA4').onclick = () => imprimirNotaPrazoA4(nota.id);
+            const btnBaixar = document.getElementById('btnBaixarPeloExtrato');
+            if (saldo > 0 && status !== 'CANCELADA') {
+                btnBaixar.classList.remove('hidden');
+                btnBaixar.onclick = () => {
+                    fecharModalExtratoNota();
+                    abrirModalBaixaNota(nota.id);
+                };
+            } else {
+                btnBaixar.classList.add('hidden');
+            }
+        }
+
+        function imprimirNotaPrazoA4(id) {
+            const nota = listaGlobalNotasPrazo.find(x => String(x.id) === String(id));
+            if (!nota) return;
+
+            const saldo = calcularSaldoNota(nota);
+            const totalPago = calcularTotalPagoNota(nota);
+            const valorOrig = parseFloat(nota.valorOriginal) || 0;
+            const area = document.getElementById('areaImpressaoFinal');
+
+            const pagtos = extrairPagamentosNota(nota).filter(p => p.status !== 'ESTORNADO');
+            let tabelaPagtosHtml = '';
+            if (pagtos.length > 0) {
+                tabelaPagtosHtml = `
+                    <div style="margin-top:14px; border:1px solid #333; padding:10px; border-radius:4px;">
+                        <strong style="font-size:11px; text-transform:uppercase;">Histórico de Pagamentos Recebidos:</strong>
+                        <table style="width:100%; border-collapse:collapse; margin-top:6px; font-size:10.5px;">
+                            <thead>
+                                <tr style="border-bottom:1px solid #666; text-align:left;">
+                                    <th style="padding:4px;">Recibo</th>
+                                    <th style="padding:4px;">Data</th>
+                                    <th style="padding:4px;">Forma</th>
+                                    <th style="padding:4px; text-align:right;">Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${pagtos.map(p => `
+                                    <tr style="border-bottom:1px dotted #ccc;">
+                                        <td style="padding:4px; font-family:monospace;">${escapeHtml(p.numeroRecibo || '-')}</td>
+                                        <td style="padding:4px;">${fD(p.dataPagamento)}</td>
+                                        <td style="padding:4px;">${escapeHtml(p.formaPagamento || '-')}</td>
+                                        <td style="padding:4px; text-align:right; font-weight:bold;">${formatadorMoeda.format(parseFloat(p.valor) || 0)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+
+            area.innerHTML = `
+                <div class="a4-print-full">
+                    <div>
+                        <div style="text-align:center; border-bottom:2px solid #000; padding-bottom:12px; margin-bottom:16px;">
+                            <h1 style="font-size:20px !important; letter-spacing:1px; margin:0;">TUCANO AUTO PEÇAS</h1>
+                            <p style="font-size:11px !important; margin:2px 0; color:#333;">Comércio de Peças e Acessórios Automotivos</p>
+                            <h2 style="font-size:15px !important; margin-top:8px; text-transform:uppercase; font-weight:900;">
+                                COMPROVANTE DE NOTA A PRAZO / CONTAS A RECEBER
+                            </h2>
+                        </div>
+
+                        <div style="display:flex; justify-content:space-between; background:#f1f5f9; padding:10px 14px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:16px;">
+                            <div>
+                                <span style="font-size:10.5px;">Nº DE CONTROLE:</span><br>
+                                <strong style="font-size:16px; font-family:monospace;">${escapeHtml(nota.numeroControle || nota.id)}</strong>
+                            </div>
+                            <div style="text-align:center;">
+                                <span style="font-size:10.5px;">EMISSÃO:</span><br>
+                                <strong style="font-size:14px;">${fD(nota.dataEmissao)}</strong>
+                            </div>
+                            <div style="text-align:right;">
+                                <span style="font-size:10.5px;">VENCIMENTO:</span><br>
+                                <strong style="font-size:16px; color:#b91c1c;">${fD(nota.dataVencimento)}</strong>
+                            </div>
+                        </div>
+
+                        <table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:11.5px;">
+                            <tr>
+                                <td style="padding:6px; border:1px solid #cbd5e1; width:60%;"><strong>CLIENTE:</strong> ${escapeHtml(nota.cliente ? nota.cliente.toUpperCase() : 'S/ NOME')}</td>
+                                <td style="padding:6px; border:1px solid #cbd5e1;"><strong>CPF / CNPJ:</strong> ${escapeHtml(nota.cpfCnpj || '-')}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:6px; border:1px solid #cbd5e1;"><strong>TELEFONE:</strong> ${escapeHtml(nota.telefone || '-')}</td>
+                                <td style="padding:6px; border:1px solid #cbd5e1;"><strong>Nº PEDIDO / DOC:</strong> ${escapeHtml(nota.numeroPedido || nota.numeroDocumento || '-')}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="2" style="padding:6px; border:1px solid #cbd5e1;">
+                                    <strong>OBSERVAÇÕES / REFERÊNCIA:</strong><br>
+                                    ${escapeHtml(nota.observacao || 'Venda de mercadorias a prazo.')}
+                                </td>
+                            </tr>
+                        </table>
+
+                        <div style="display:flex; gap:10px; margin-bottom:16px;">
+                            <div style="flex:1; border:2px solid #000; padding:10px; text-align:center; border-radius:6px;">
+                                <div style="font-size:10px; font-weight:bold; text-transform:uppercase;">VALOR ORIGINAL</div>
+                                <div style="font-size:20px; font-weight:900; margin-top:3px;">${formatadorMoeda.format(valorOrig)}</div>
+                            </div>
+                            <div style="flex:1; border:2px solid #000; padding:10px; text-align:center; border-radius:6px; background:#f8fafc;">
+                                <div style="font-size:10px; font-weight:bold; text-transform:uppercase;">TOTAL RECEBIDO</div>
+                                <div style="font-size:20px; font-weight:900; color:#15803d; margin-top:3px;">${formatadorMoeda.format(totalPago)}</div>
+                            </div>
+                            <div style="flex:1; border:2px solid #000; padding:10px; text-align:center; border-radius:6px;">
+                                <div style="font-size:10px; font-weight:bold; text-transform:uppercase;">SALDO RESTANTE</div>
+                                <div style="font-size:20px; font-weight:900; color:#b91c1c; margin-top:3px;">${formatadorMoeda.format(saldo)}</div>
+                            </div>
+                        </div>
+
+                        ${tabelaPagtosHtml}
+
+                        <div style="margin-top:20px; padding:12px; border:1px dashed #666; background:#fafafa; font-size:10.5px; line-height:1.5; border-radius:6px;">
+                            <strong>TERMO DE RECONHECIMENTO DE DÍVIDA:</strong><br>
+                            Reconheço(emos) a exatidão da dívida acima descrita, correspondente à aquisição de mercadorias e/ou prestação de serviços junto à <strong>TUCANO AUTO PEÇAS</strong>, e comprometo-me(nos) a efetuar a liquidação integral até a data de vencimento indicada neste comprovante.
+                        </div>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; margin-top:50px; padding-bottom:15px;">
+                        <div class="linha-assinatura-a4">
+                            <strong>TUCANO AUTO PEÇAS</strong><br>
+                            <span>Responsável pelo Recebimento</span>
+                        </div>
+                        <div class="linha-assinatura-a4">
+                            <strong>${escapeHtml(nota.cliente ? nota.cliente.toUpperCase() : 'ASSINATURA DO CLIENTE')}</strong><br>
+                            <span>Assinatura do Cliente</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            setTimeout(() => { window.print(); }, 300);
+        }
+
+        function imprimirReciboPagamentoA4(idNota, idPagamento) {
+            const nota = listaGlobalNotasPrazo.find(x => String(x.id) === String(idNota));
+            if (!nota) return;
+
+            const pagtos = extrairPagamentosNota(nota);
+            const pagto = pagtos.find(p => String(p.id) === String(idPagamento));
+            if (!pagto) {
+                Swal.fire('Erro', 'Pagamento não localizado.', 'error');
+                return;
+            }
+
+            const valorOrig = parseFloat(nota.valorOriginal) || 0;
+            const valorPago = parseFloat(pagto.valor) || 0;
+            const pagtosAtivosAteAgora = pagtos.filter(p => p.status !== 'ESTORNADO');
+            const totalRecebidoAcumulado = pagtosAtivosAteAgora.reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0);
+            const saldoRestante = Math.max(0, Math.round((valorOrig - totalRecebidoAcumulado) * 100) / 100);
+            const isQuitacao = saldoRestante <= 0;
+
+            const tituloRecibo = isQuitacao ? 'RECIBO DE QUITAÇÃO' : 'RECIBO DE PAGAMENTO';
+            const area = document.getElementById('areaImpressaoFinal');
+
+            area.innerHTML = `
+                <div class="a4-print-full">
+                    <div>
+                        <div style="text-align:center; border-bottom:2px solid #000; padding-bottom:12px; margin-bottom:16px;">
+                            <h1 style="font-size:20px !important; letter-spacing:1px; margin:0;">TUCANO AUTO PEÇAS</h1>
+                            <p style="font-size:11px !important; margin:2px 0; color:#333;">Comércio de Peças e Acessórios Automotivos</p>
+                            <h2 style="font-size:16px !important; margin-top:8px; text-transform:uppercase; font-weight:900; color:${isQuitacao ? '#15803d' : '#000'};">
+                                ${tituloRecibo}
+                            </h2>
+                        </div>
+
+                        <div style="display:flex; justify-content:space-between; background:#f1f5f9; padding:10px 14px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:16px;">
+                            <div>
+                                <span style="font-size:10.5px;">Nº DO RECIBO:</span><br>
+                                <strong style="font-size:16px; font-family:monospace; color:#1e40af;">${escapeHtml(pagto.numeroRecibo || pagto.id)}</strong>
+                            </div>
+                            <div style="text-align:center;">
+                                <span style="font-size:10.5px;">NOTA VINCULADA:</span><br>
+                                <strong style="font-size:14px; font-family:monospace;">${escapeHtml(nota.numeroControle || nota.id)}</strong>
+                            </div>
+                            <div style="text-align:right;">
+                                <span style="font-size:10.5px;">DATA DO PAGAMENTO:</span><br>
+                                <strong style="font-size:15px;">${fD(pagto.dataPagamento)}</strong>
+                            </div>
+                        </div>
+
+                        <table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:11.5px;">
+                            <tr>
+                                <td style="padding:6px; border:1px solid #cbd5e1; width:60%;"><strong>CLIENTE:</strong> ${escapeHtml(nota.cliente ? nota.cliente.toUpperCase() : 'S/ NOME')}</td>
+                                <td style="padding:6px; border:1px solid #cbd5e1;"><strong>CPF / CNPJ:</strong> ${escapeHtml(nota.cpfCnpj || '-')}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:6px; border:1px solid #cbd5e1;"><strong>Nº PEDIDO / DOC:</strong> ${escapeHtml(nota.numeroPedido || nota.numeroDocumento || '-')}</td>
+                                <td style="padding:6px; border:1px solid #cbd5e1;"><strong>FORMA DE PAGAMENTO:</strong> ${escapeHtml(pagto.formaPagamento || 'Dinheiro')}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:6px; border:1px solid #cbd5e1;"><strong>DATA DA VENDA (EMISSÃO):</strong> ${fD(nota.dataEmissao)}</td>
+                                <td style="padding:6px; border:1px solid #cbd5e1;"><strong>VENCIMENTO ORIGINAL:</strong> ${fD(nota.dataVencimento)}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="2" style="padding:6px; border:1px solid #cbd5e1;">
+                                    <strong>OBSERVAÇÕES DO PAGAMENTO:</strong><br>
+                                    ${escapeHtml(pagto.observacao || 'Pagamento referente à Nota a Prazo indicada acima.')}
+                                </td>
+                            </tr>
+                        </table>
+
+                        <div style="display:flex; gap:10px; margin-bottom:18px;">
+                            <div style="flex:1; border:1.5px solid #64748b; padding:10px; text-align:center; border-radius:6px;">
+                                <div style="font-size:10px; font-weight:bold; text-transform:uppercase;">VALOR ORIGINAL</div>
+                                <div style="font-size:18px; font-weight:bold; margin-top:3px;">${formatadorMoeda.format(valorOrig)}</div>
+                            </div>
+                            <div style="flex:1.2; border:2.5px solid #16a34a; padding:10px; text-align:center; border-radius:6px; background:#f0fdf4;">
+                                <div style="font-size:10.5px; font-weight:900; text-transform:uppercase; color:#15803d;">PAGO NESTE RECIBO</div>
+                                <div style="font-size:22px; font-weight:900; color:#15803d; margin-top:3px;">${formatadorMoeda.format(valorPago)}</div>
+                            </div>
+                            <div style="flex:1; border:1.5px solid #64748b; padding:10px; text-align:center; border-radius:6px;">
+                                <div style="font-size:10px; font-weight:bold; text-transform:uppercase;">TOTAL RECEBIDO</div>
+                                <div style="font-size:18px; font-weight:bold; margin-top:3px;">${formatadorMoeda.format(totalRecebidoAcumulado)}</div>
+                            </div>
+                            <div style="flex:1; border:1.5px solid #64748b; padding:10px; text-align:center; border-radius:6px; background:${saldoRestante > 0 ? '#fef2f2' : '#f0fdf4'};">
+                                <div style="font-size:10px; font-weight:bold; text-transform:uppercase;">SALDO RESTANTE</div>
+                                <div style="font-size:18px; font-weight:900; color:${saldoRestante > 0 ? '#b91c1c' : '#15803d'}; margin-top:3px;">
+                                    ${formatadorMoeda.format(saldoRestante)}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top:16px; padding:12px; border:1px solid #94a3b8; background:#f8fafc; font-size:11px; line-height:1.6; border-radius:6px;">
+                            <strong>DECLARAÇÃO DE RECEBIMENTO:</strong><br>
+                            Declaramos para os devidos fins que recebemos de <strong>${escapeHtml(nota.cliente ? nota.cliente.toUpperCase() : 'CLIENTE')}</strong> a importância de <strong>${formatadorMoeda.format(valorPago)}</strong> através de <strong>${escapeHtml(pagto.formaPagamento || 'Dinheiro')}</strong>, referente ao ${isQuitacao ? '<strong>PAGAMENTO TOTAL E QUITAÇÃO DEFINITIVA</strong>' : '<strong>PAGAMENTO PARCIAL</strong>'} da Nota a Prazo nº <strong>${escapeHtml(nota.numeroControle || nota.id)}</strong>${saldoRestante > 0 ? `, restando o saldo de <strong>${formatadorMoeda.format(saldoRestante)}</strong>` : ''}.
+                        </div>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; margin-top:50px; padding-bottom:15px;">
+                        <div class="linha-assinatura-a4">
+                            <strong>TUCANO AUTO PEÇAS</strong><br>
+                            <span>Responsável pelo Recebimento</span>
+                        </div>
+                        <div class="linha-assinatura-a4">
+                            <strong>${escapeHtml(nota.cliente ? nota.cliente.toUpperCase() : 'CLIENTE')}</strong><br>
+                            <span>Assinatura do Cliente</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            setTimeout(() => { window.print(); }, 300);
+        }
+
+        function imprimirUltimoReciboNota(idNota) {
+            const nota = listaGlobalNotasPrazo.find(x => String(x.id) === String(idNota));
+            if (!nota) return;
+            const pagtos = extrairPagamentosNota(nota).filter(p => p.status !== 'ESTORNADO');
+            if (pagtos.length === 0) {
+                Swal.fire('Aviso', 'Nenhum pagamento registrado nesta nota.', 'info');
+                return;
+            }
+            const ultimo = pagtos[pagtos.length - 1];
+            imprimirReciboPagamentoA4(idNota, ultimo.id);
+        }
         
         resetDatas();
+        resetDatasNotaPrazo();
+
     </script>
 </body>
 </html>

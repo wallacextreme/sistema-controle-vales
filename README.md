@@ -1,26 +1,36 @@
-# Tucano Cloud - Sistema de Controle de Vales
+# Tucano Cloud - Vales de Crédito & Notas a Prazo
 
-Sistema de gerenciamento, emissão e controle de vales de compra e trocas comerciais para lojas e varejo. Desenvolvido como aplicação desktop leve e de alta performance utilizando **Tauri v2** e **Firebase Realtime Database**.
+Sistema completo de gestão comercial para varejo e lojas, contendo dois módulos independentes de alta precisão: **Vales de Crédito ao Consumidor** e **Notas a Prazo (Contas a Receber)**. Desenvolvido como aplicação desktop de alta performance utilizando **Tauri v2** e **Firebase Realtime Database**.
 
 ---
 
-## 🚀 Funcionalidades
+## 🚀 Módulos do Sistema
 
-- **Emissão de Vales**: Cadastro ágil com cliente, vendedor, autorizador, valor e datas de emissão/validade.
-- **Controle de Saldo e Baixas**: Amortização parcial e baixa total de vales com histórico detalhado por operação.
-- **Sincronização em Tempo Real**: Atualizações automáticas e instantâneas via Firebase Realtime Database com indicador visual de status de conexão (Online/Offline).
-- **Impressão Profissional**: Geração e formatação de comprovantes em meia folha A4 e compatibilidade para impressão rápida / PDF.
-- **Painel de Controle e Auditoria**: Visão consolidada de vales em aberto, parciais e quitados com métricas e filtros rápidos.
-- **Segurança e Privilégios**: Autenticação de operadores por Firebase Auth e proteção para operações administrativas sensíveis (cancelamento, alteração de regras) por Senha Mestre local.
+### 1. 🏷️ Vales de Crédito
+- **Emissão Ágil**: Cadastro com cliente, vendedor, autorizador, valor e datas de emissão/validade.
+- **Controle de Saldo e Amortizações**: Baixas parciais e totais com histórico por operação.
+- **Impressão Térmica / Meia Folha A4**: Layout otimizado para meia folha A4 com vias para carimbo/assinatura.
+- **Painel de Auditoria e CSV**: Exportação para contabilidade e auditoria com senha mestre.
+
+### 2. 📅 Notas a Prazo (Contas a Receber)
+- **Emissão e Cálculo de Vencimento**: Cálculo automático de 30 dias corridos (com precisão para viradas de mês, anos bissextos e viradas de ano). Identificador legível único `NP-XXXXXXXX`.
+- **Baixas e Amortizações Múltiplas**: Controle estrito de saldo devedor. Bloqueio automático de pagamentos acima do saldo ou em notas já quitadas/canceladas.
+- **Recibos Individuais**: Cada pagamento gera seu próprio recibo numerado `REC-XXXXXXXX`.
+- **Estorno Seguro**: Pagamentos incorretos podem ser estornados com senha mestre e motivo registrado, sem apagar o histórico da auditoria.
+- **Cancelamento Controlado**: Notas canceladas são mantidas no banco de dados para conformidade fiscal e auditoria.
+- **Impressão Independente em A4**:
+  - Comprovante de Nota a Prazo em A4 com Termo de Reconhecimento de Dívida.
+  - Recibo de Pagamento Parcial / Recibo de Quitação Definitiva em A4 com texto declaratório e assinaturas da empresa e do cliente.
+- **Dashboard e Filtros em Tempo Real**: Métricas consolidadas (Abertas, Parciais, Vencendo, Vencidas, Quitadas, Recebido Hoje) e busca avançada por cliente, NP, pedido, NF e telefone.
 
 ---
 
 ## 🛠️ Tecnologias Utilizadas
 
-- **Frontend**: HTML5, Vanilla JavaScript, CSS3 moderno com TailwindCSS e componentes SweetAlert2.
+- **Frontend**: HTML5, Vanilla JavaScript, CSS3 com TailwindCSS e componentes SweetAlert2.
 - **Backend / Desktop**: [Tauri v2](https://tauri.app/) (Rust) - executável nativo leve e seguro.
-- **Banco de Dados & Autenticação**: Google Firebase (Realtime Database & Firebase Authentication).
-- **Utilitários**: IMask (máscaras de campos monetários) e html2pdf.js.
+- **Banco de Dados & Autenticação**: Google Firebase (Realtime Database `/vales` e `/notasPrazo` independentes + Firebase Authentication).
+- **Utilitários**: IMask (máscaras monetárias) e html2pdf.js.
 
 ---
 
@@ -28,8 +38,8 @@ Sistema de gerenciamento, emissão e controle de vales de compra e trocas comerc
 
 ### 1. Clonar o repositório
 ```bash
-git clone https://github.com/<usuario>/<repositorio>.git
-cd <repositorio>
+git clone https://github.com/wallacextreme/sistema-controle-vales.git
+cd sistema-controle-vales
 ```
 
 ### 2. Configurar o Firebase
@@ -62,6 +72,7 @@ npm run tauri dev
 
 ---
 
-## 🔒 Segurança e Dados
-- As credenciais ativas de produção e os dados dos clientes **não** fazem parte do controle de versão (`.gitignore`).
-- As transações com o Firebase são protegidas por autenticação de usuário e regras de segurança (Security Rules).
+## 🔒 Segurança e Compatibilidade de Dados
+- **Zero Migração Destrutiva**: A coleção legada `/vales` permanece 100% intacta.
+- **Compatibilidade de Backup**: O sistema importa automaticamente backups antigos no formato v1 (array direto de vales) e backups no novo formato v2 (`{ schemaVersion: 2, vales: [], notasPrazo: [] }`) via restauração do tipo merge por ID sem perda de dados.
+- **Segurança de Credenciais**: As chaves ativas de produção e os dados dos clientes **não** fazem parte do Git (`.gitignore`).
