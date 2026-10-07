@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tucano Auto Peças - Sistema Cloud Oficial</title>
+
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://unpkg.com/imask"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f1f5f9; }
+        
+        /* AJUSTE DE IMPRESSÃO - MEIA FOLHA A4 */
+        @media print {
+            @page { size: A4; margin: 0; }
+            .no-print { display: none !important; }
+            body { background: white !important; color: black !important; }
+            .print-only { display: block !important; }
+            
+            .vale-print { 
+                width: 148mm; 
+                height: 105mm; 
+                padding: 10mm;
+                border: 1px dashed #666; 
+                margin: 0;
+                box-sizing: border-box;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                color: black !important;
+            }
+            .linha-assinatura { border-top: 1px solid #000; width: 45%; text-align: center; margin-top: 25px; font-size: 9px !important; }
+            h1 { font-size: 14px !important; margin-bottom: 2px !important; font-weight: bold; }
+            p, span, div { font-size: 11px !important; line-height: 1.3 !important; }
+            .valor-box { border: 2px solid #000; padding: 10px; text-align: center; margin: 10px 0; }
+            .valor-texto { font-size: 28px !important; font-weight: 900 !important; }
+        }
+        
+        .print-only { display: none; }
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+        .btn-gradient { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); }
+        .painel-container { max-height: 75vh; overflow: auto; }
+        th { position: sticky; top: 0; background: #1e293b; z-index: 20; white-space: nowrap; padding: 12px; font-size: 11px; }
+        td { white-space: nowrap; padding: 12px; font-size: 11px; border-bottom: 1px solid #334155; }
+
+        /* PULSO DE STATUS DE SINCRONIZAÇÃO */
+        @keyframes pulseGlow {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.25); opacity: 0.7; }
+        }
+        .dot-online {
+            background-color: #22c55e;
+            box-shadow: 0 0 8px #22c55e;
+            animation: pulseGlow 2s infinite ease-in-out;
+        }
+        .dot-offline {
+            background-color: #f59e0b;
+            box-shadow: 0 0 6px #f59e0b;
+        }
+    </style>
+</head>
+<body class="min-h-screen custom-scrollbar pb-10">
+
+    <div id="telaLogin" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950">
+        <div class="bg-slate-800 p-8 rounded-3xl border border-slate-700 shadow-2xl w-full max-w-md text-center">
+            <h2 class="text-2xl font-bold mb-6">Tucano Auto Peças</h2>
+            <form id="formLogin" class="space-y-4">
+                <input type="email" id="loginEmail" placeholder="E-mail" required class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl text-white outline-none">
+                <input type="password" id="loginSenha" placeholder="Senha" required class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl text-white outline-none">
+                <button type="submit" class="w-full btn-gradient py-4 rounded-xl font-bold">ENTRAR</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="conteudoSistema" class="hidden">
+        <header class="bg-slate-800/50 backdrop-blur-md border-b border-slate-700 sticky top-0 z-40 no-print">
+            <div class="container mx-auto px-4 py-4 flex justify-between items-center gap-4 flex-wrap">
+                <div class="flex items-center gap-3">
+                    <h1 class="text-xl font-bold">Tucano <span class="text-orange-500">Cloud</span></h1>
+                    <!-- INDICADOR DE SINCRONIZAÇÃO EM TEMPO REAL -->
+                    <div id="statusConexao" class="flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-medium bg-slate-900/70 border border-slate-700/80 shadow-inner">
+                        <span id="bolinhaStatus" class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+                        <span id="textoStatus" class="text-slate-400 font-semibold">Conectando...</span>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="abrirPainelGerencial()" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg text-xs font-bold transition">📊 Painel de Controle</button>
+                    <button onclick="realizarLogout()" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-xs font-bold transition">Sair</button>
+                </div>
+            </div>
+        </header>
+
+        <main class="container mx-auto p-4 md:p-6 space-y-6 no-print">
+            <div class="grid lg:grid-cols-12 gap-6">
+                <div class="lg:col-span-4">
+                    <section class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
+                        <h2 class="text-lg font-bold mb-5 flex items-center gap-2 text-blue-400">Novo Vale</h2>
+                        <form id="formCadastroVale" class="space-y-4">
+                            <div class="grid grid-cols-2 gap-3">
+                                <input type="date" id="campoDataEmissao" required class="w-full bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm text-white">
+                                <input type="date" id="campoDataValidade" required class="w-full bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm text-white">
+                            </div>
+                            <input type="text" id="campoNomeCliente" placeholder="Nome do Cliente" required class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm text-white">
+                            
+                            <div class="grid grid-cols-2 gap-3">
+                                <input type="text" id="campoNumeroPedido" placeholder="Nº Pedido" required class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm text-white">
+                                <input type="text" id="campoValorOriginal" placeholder="R$ 0,00" required class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm font-bold text-green-400">
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <input type="text" id="campoVendedor" placeholder="Vendedor" required class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm text-white">
+                                <input type="text" id="campoAutorizador" placeholder="Autorizado por" required class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm text-white">
+                            </div>
+                            
+                            <textarea id="campoObservacao" rows="2" placeholder="Motivo / Obs" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm text-white"></textarea>
+                            <button type="submit" id="btnSalvarVale" class="w-full btn-gradient py-4 rounded-xl font-bold text-sm shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">SALVAR VALE</button>
+                        </form>
+                    </section>
+                </div>
+
+                <div class="lg:col-span-8 space-y-4">
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div onclick="definirFiltroStatus('nao_utilizados')" id="cardNaoUtilizados" class="bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-lg cursor-pointer transition-all duration-200 hover:border-blue-500 select-none border-2">
+                            <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Não Utilizados</div>
+                            <div id="somaNaoUtilizados" class="text-xl font-extrabold text-green-400 mt-1">R$ 0,00</div>
+                            <div id="qtdNaoUtilizados" class="text-[11px] text-slate-500 mt-0.5">0 vales intactos</div>
+                        </div>
+                        <div onclick="definirFiltroStatus('parciais')" id="cardParciais" class="bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-lg cursor-pointer transition-all duration-200 hover:border-blue-500 select-none border-2">
+                            <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Usados Parcial</div>
+                            <div id="somaParciais" class="text-xl font-extrabold text-amber-400 mt-1">R$ 0,00</div>
+                            <div id="qtdParciais" class="text-[11px] text-slate-500 mt-0.5">0 com saldo</div>
+                        </div>
+                        <div onclick="definirFiltroStatus('baixados')" id="cardBaixados" class="bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-lg cursor-pointer transition-all duration-200 hover:border-blue-500 select-none border-2">
+                            <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Totalmente Baixados</div>
+                            <div id="somaBaixados" class="text-xl font-extrabold text-red-400 mt-1">R$ 0,00</div>
+                            <div id="qtdBaixados" class="text-[11px] text-slate-500 mt-0.5">0 liquidados</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/40 border border-slate-700/60 rounded-xl p-3 flex flex-wrap justify-between items-center text-xs gap-3 shadow-inner">
+                        <div class="text-slate-300">Total Geral Já Utilizado (Baixado): <span id="balancoUtilizadoTotal" class="font-bold text-red-400 ml-1">R$ 0,00</span></div>
+                        <div class="text-slate-300">Total Geral a Utilizar (Saldo Restante): <span id="balancoPendenteTotal" class="font-bold text-green-400 ml-1">R$ 0,00</span></div>
+                    </div>
+
+                    <input type="text" id="inputFiltroBusca" oninput="atualizarTabelaPrincipal()" placeholder="🔍 Pesquisar por cliente, pedido ou ID..." class="w-full bg-slate-800 border border-slate-700 px-5 py-4 rounded-2xl text-white outline-none">
+                    
+                    <div class="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden shadow-2xl">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-900/50 text-[10px] uppercase font-bold text-slate-400">
+                                <tr><th class="p-4">ID</th><th>Cliente</th><th>Saldo Atual</th><th class="text-right p-4">Ações</th></tr>
+                            </thead>
+                            <tbody id="tabelaCorpoPrincipal" class="text-sm divide-y divide-slate-700/50"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL PAINEL DE CONTROLE / AUDITORIA -->
+    <div id="modalPainelControle" class="fixed inset-0 bg-slate-950/98 backdrop-blur-md hidden z-[60] flex items-center justify-center p-4 no-print">
+        <div class="bg-slate-800 w-full max-w-[98vw] h-[95vh] rounded-3xl border border-slate-700 flex flex-col overflow-hidden shadow-2xl">
+            <div class="p-5 border-b border-slate-700 flex justify-between items-center bg-slate-900/50 gap-4 flex-wrap">
+                <div class="flex items-center gap-4 flex-wrap">
+                    <h2 class="font-bold text-xl text-white">📊 Painel de Auditoria</h2>
+                    <div class="flex gap-2 flex-wrap">
+                        <button onclick="gerarBackupDadosJSON()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl text-[10px] font-bold border border-slate-600 transition">📥 BACKUP</button>
+                        <label class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl text-[10px] font-bold border border-slate-600 cursor-pointer transition">
+                            📤 IMPORTAR <input type="file" accept=".json" hidden onchange="importarDadosJSON(event)">
+                        </label>
+                        <!-- BOTÃO EXPORTAR CSV PARA CONTABILIDADE -->
+                        <button onclick="exportarValesCSV()" class="bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-xl text-[10px] font-bold border border-emerald-500 text-white transition flex items-center gap-1.5 shadow">📊 EXPORTAR CSV</button>
+                    </div>
+                    
+                    <div class="flex items-center gap-2 border-l border-slate-700 pl-4">
+                        <input type="password" id="campoNovaSenhaMaster" placeholder="Nova Senha Master" class="bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg text-xs text-white outline-none w-32">
+                        <button onclick="alterarSenhaMaster()" class="bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition">Alterar Senha</button>
+                    </div>
+                </div>
+                <button onclick="fecharModalPainel()" class="bg-red-900/30 text-red-400 hover:bg-red-900/50 px-6 py-2 rounded-xl text-xs font-bold border border-red-900/50 transition">FECHAR</button>
+            </div>
+            <div class="painel-container flex-1 custom-scrollbar">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="text-slate-400 uppercase font-black border-b border-slate-700">
+                            <th>ID</th><th>Emissão</th><th>Validade</th><th>Cliente</th><th>Status</th><th>Pedido</th><th>Original</th><th>Saldo</th><th>Baixas</th><th>Vendedor</th><th>Autorizado</th><th>Motivo</th><th class="text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelaCorpoPainelCompleto" class="divide-y divide-slate-800"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL REALIZAR BAIXA -->
+    <div id="modalRealizarBaixa" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm hidden z-[70] flex items-center justify-center p-4 no-print">
+        <div class="bg-slate-800 w-full max-w-md rounded-3xl border border-slate-700 shadow-2xl p-8">
+            <h3 class="font-bold text-xl text-center mb-2">Utilizar Crédito</h3>
+            <p id="textoSaldoDisponivel" class="text-center text-blue-400 font-bold text-sm mb-6"></p>
+            <input type="hidden" id="idValeSendoBaixado">
+            <div class="space-y-4">
+                <input type="text" id="campoValorBaixa" required class="w-full bg-slate-900 border border-slate-700 p-4 rounded-xl text-2xl font-black text-green-400 text-center outline-none">
+                <input type="text" id="campoNotaVendaBaixa" placeholder="Nº Nova Venda" required class="w-full bg-slate-900 border border-slate-700 p-3 rounded-xl text-center text-white outline-none">
+            </div>
+            <div class="flex gap-3 mt-8">
+                <button onclick="fecharModalBaixa()" class="flex-1 bg-slate-700 hover:bg-slate-600 py-4 rounded-2xl font-bold transition">Sair</button>
+                <button id="btnConfirmarBaixa" onclick="confirmarProcessoDeBaixa()" class="flex-1 bg-green-600 hover:bg-green-700 py-4 rounded-2xl font-bold transition disabled:opacity-50 disabled:cursor-not-allowed">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE EXTRATO E HISTÓRICO DE BAIXAS -->
+    <div id="modalExtratoVale" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm hidden z-[70] flex items-center justify-center p-4 no-print">
+        <div class="bg-slate-800 w-full max-w-2xl rounded-3xl border border-slate-700 shadow-2xl p-6 flex flex-col max-h-[90vh]">
+            <div class="flex justify-between items-start border-b border-slate-700 pb-4">
+                <div>
+                    <h3 class="font-bold text-xl text-white flex items-center gap-2">
+                        📋 Extrato do Vale <span id="extratoValeId" class="text-blue-400 font-mono"></span>
+                    </h3>
+                    <p id="extratoCliente" class="text-slate-300 text-sm mt-1"></p>
+                </div>
+                <button onclick="fecharModalExtrato()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white px-3 py-1.5 rounded-xl text-xs font-bold transition">✕ Fechar</button>
+            </div>
+
+            <!-- Dados Resumidos -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4">
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700/60">
+                    <div class="text-[10px] uppercase font-bold text-slate-400">Emissão</div>
+                    <div id="extratoDataEmissao" class="text-sm font-semibold text-slate-200 mt-0.5">-</div>
+                </div>
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700/60">
+                    <div class="text-[10px] uppercase font-bold text-slate-400">Validade</div>
+                    <div id="extratoDataValidade" class="text-sm font-semibold text-slate-200 mt-0.5">-</div>
+                </div>
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700/60">
+                    <div class="text-[10px] uppercase font-bold text-slate-400">Valor Original</div>
+                    <div id="extratoValorOriginal" class="text-sm font-bold text-blue-400 mt-0.5">R$ 0,00</div>
+                </div>
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700/60">
+                    <div class="text-[10px] uppercase font-bold text-slate-400">Saldo Atual</div>
+                    <div id="extratoSaldoAtual" class="text-sm font-bold text-green-400 mt-0.5">R$ 0,00</div>
+                </div>
+            </div>
+
+            <!-- Detalhes complementares -->
+            <div id="extratoInfoComplementar" class="text-xs text-slate-400 bg-slate-900/40 p-3 rounded-xl border border-slate-700/40 mb-4 space-y-1"></div>
+
+            <!-- Tabela de Baixas -->
+            <div class="flex-1 overflow-auto custom-scrollbar border border-slate-700/60 rounded-xl bg-slate-900/40 min-h-[140px]">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-900/80 text-[10px] uppercase font-bold text-slate-400">
+                        <tr>
+                            <th class="p-3">#</th>
+                            <th class="p-3">Data da Baixa</th>
+                            <th class="p-3">Nota / Venda</th>
+                            <th class="p-3 text-right">Valor Abatido</th>
+                        </tr>
+                    </thead>
+                    <tbody id="extratoCorpoBaixas" class="divide-y divide-slate-800 text-xs"></tbody>
+                </table>
+            </div>
+
+            <!-- Rodapé com Ações -->
+            <div class="flex justify-between items-center mt-4 pt-3 border-t border-slate-700">
+                <div id="extratoStatusBadge" class="text-xs font-bold"></div>
+                <div class="flex gap-2">
+                    <button id="btnImprimirExtrato" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl text-xs font-bold text-white transition flex items-center gap-1">🖨️ Imprimir</button>
+                    <button onclick="fecharModalExtrato()" class="bg-indigo-600 hover:bg-indigo-700 px-5 py-2 rounded-xl text-xs font-bold text-white transition">Concluir</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ÁREA DE IMPRESSÃO (MEIA FOLHA A4) -->
+    <div id="areaImpressaoFinal" class="print-only"></div>
+
+    <!-- CARREGAMENTO SEGURO DE CONFIGURAÇÃO (LOCAL / PRODUÇÃO) -->
+    <script src="firebase-config.js"></script>
+
+    <script>
+        // ==========================================
+        // 1. CONFIGURAÇÃO E AMBIENTE
+        // ==========================================
+        // Carrega a configuração do arquivo local 'firebase-config.js'
+        // Se ausente (ex: repositório público do GitHub), utiliza modelo de segurança
+        const firebaseConfig = window.firebaseConfig || {
+            apiKey: "SUA_API_KEY_AQUI",
+            authDomain: "seu-projeto.firebaseapp.com",
+            databaseURL: "https://seu-projeto-default-rtdb.firebaseio.com",
+            projectId: "seu-projeto",
+            storageBucket: "seu-projeto.firebasestorage.app",
+            messagingSenderId: "000000000000",
+            appId: "1:000000000000:web:0000000000000000000000"
+        };
+
+        if (window.location.protocol === 'file:') {
+            setTimeout(() => {
+                Swal.fire({
+                    title: 'Ambiente Incorreto Detectado',
+                    html: `Você abriu o sistema dando dois cliques no arquivo (<code>file://</code>).<br><br>
+                           Os navegadores modernos bloqueiam funções avançadas do Firebase neste modo.<br><br>
+                           Recomendamos o uso de um servidor local (Live Server), mas a validação por senha mestre local foi ativada.`,
+                    icon: 'warning',
+                    allowOutsideClick: false,
+                    confirmButtonText: 'Entendido'
+                });
+            }, 800);
+        }
+
+        if (!window.firebaseConfig) {
+            console.warn("Aviso: 'firebase-config.js' não foi detectado. Para conectar, duplique 'firebase-config.example.js' como 'firebase-config.js' e insira suas credenciais.");
+        }
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const database = firebase.database();
+        
+        let listaGlobalVales = [];
+        let valesMap = {}; 
+        let filtroStatusAtual = 'todos'; 
+        let valesRefGlobal = null; 
+        
+        const formatadorMoeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        // ==========================================
+        // 2. SEGURANÇA CONTRA XSS E UTILITÁRIOS
+        // ==========================================
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function verificarSeVencido(vale) {
+            const dataVal = vale.dataValidade || vale.validade;
+            if (!dataVal) return false;
+            const hojeStr = new Date().toISOString().split('T')[0];
+            return dataVal < hojeStr;
+        }
+
+        // ==========================================
+        // 3. MONITORAMENTO DE CONEXÃO EM TEMPO REAL
+        // ==========================================
+        database.ref('.info/connected').on('value', (snap) => {
+            const isConnected = snap.val() === true;
+            const bolinha = document.getElementById('bolinhaStatus');
+            const texto = document.getElementById('textoStatus');
+            if (bolinha && texto) {
+                if (isConnected) {
+                    bolinha.className = 'w-2.5 h-2.5 rounded-full dot-online';
+                    texto.textContent = 'Online';
+                    texto.className = 'text-green-400 font-semibold';
+                } else {
+                    bolinha.className = 'w-2.5 h-2.5 rounded-full dot-offline';
+                    texto.textContent = 'Offline';
+                    texto.className = 'text-amber-400 font-semibold';
+                }
+            }
+        });
+
+        // ==========================================
+        // 4. SISTEMA DE PRIVILÉGIOS (LOCALSTORAGE)
+        // ==========================================
+        async function validarSenhaMaster() {
+            // Lê do LocalStorage do Tauri. Se não existir, usa '1234' como padrão.
+            const senhaSalva = localStorage.getItem('senhaMasterTucano') || '1234';
+            
+            const { value: senha } = await Swal.fire({
+                title: 'Acesso Restrito',
+                input: 'password',
+                inputLabel: 'Digite a senha mestre para continuar',
+                inputPlaceholder: 'Senha',
+                showCancelButton: true,
+                confirmButtonText: 'Acessar',
+                cancelButtonText: 'Cancelar'
+            });
+            return senha === senhaSalva;
+        }
+
+        // ==========================================
+        // 5. AUTENTICAÇÃO E SESSÃO
+        // ==========================================
+        document.getElementById('formLogin').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value.trim();
+            const senha = document.getElementById('loginSenha').value;
+
+            auth.signInWithEmailAndPassword(email, senha).catch((error) => {
+                Swal.fire('Erro de Acesso', 'E-mail/senha incorretos ou ambiente bloqueado (file://).', 'error');
+            });
+        });
+
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                document.getElementById('telaLogin').classList.add('hidden');
+                document.getElementById('conteudoSistema').classList.remove('hidden');
+                
+                if (valesRefGlobal) valesRefGlobal.off();
+                valesRefGlobal = database.ref('vales');
+                
+                valesRefGlobal.on('child_added', (snap) => {
+                    valesMap[snap.key] = snap.val();
+                    listaGlobalVales = Object.values(valesMap);
+                    atualizarTabelaPrincipal();
+                });
+
+                valesRefGlobal.on('child_changed', (snap) => {
+                    valesMap[snap.key] = snap.val();
+                    listaGlobalVales = Object.values(valesMap);
+                    atualizarTabelaPrincipal();
+                    if (!document.getElementById('modalPainelControle').classList.contains('hidden')) renderPainel();
+                });
+
+                valesRefGlobal.on('child_removed', (snap) => {
+                    delete valesMap[snap.key];
+                    listaGlobalVales = Object.values(valesMap);
+                    atualizarTabelaPrincipal();
+                    if (!document.getElementById('modalPainelControle').classList.contains('hidden')) renderPainel();
+                });
+                
+            } else {
+                document.getElementById('telaLogin').classList.remove('hidden');
+                document.getElementById('conteudoSistema').classList.add('hidden');
+                if (valesRefGlobal) { valesRefGlobal.off(); valesRefGlobal = null; }
+            }
+        });
+
+        function realizarLogout() { auth.signOut(); }
+
+        // ==========================================
+        // 6. MÁSCARAS E FUNÇÕES UTILITÁRIAS
+        // ==========================================
+        const mValor = IMask(document.getElementById('campoValorOriginal'), { mask: 'R$ num', blocks: { num: { mask: Number, thousandsSeparator: '.', padFractionalZeros: true, radix: ',', mapToRadix: ['.'] } } });
+        const mBaixa = IMask(document.getElementById('campoValorBaixa'), { mask: 'R$ num', blocks: { num: { mask: Number, thousandsSeparator: '.', padFractionalZeros: true, radix: ',', mapToRadix: ['.'] } } });
+
+        function toF(t) { return parseFloat(t.replace('R$', '').replace(/\./g, '').replace(',', '.')) || 0; }
+        function fD(d) { if(!d) return '-'; const [y,m,d_] = d.split('-'); return `${d_}/${m}/${y}`; }
+
+        function calcularSaldoRestante(vale) {
+            const baixas = vale.baixas ? Object.values(vale.baixas) : [];
+            const totalUso = baixas.reduce((acc, item) => acc + (parseFloat(item.valorUsado) || 0), 0);
+            const valorBase = parseFloat(vale.valorOriginal) || parseFloat(vale.valor) || 0;
+            return Math.max(0, valorBase - totalUso);
+        }
+
+        // ==========================================
+        // 7. OPERAÇÕES DE VALES (CADASTRO, BAIXA E EXCLUSÃO)
+        // ==========================================
+        document.getElementById('formCadastroVale').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const btnSubmit = document.getElementById('btnSalvarVale');
+            if (btnSubmit.disabled) return;
+            const textoOriginal = btnSubmit.innerHTML;
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = 'Processando...';
+
+            const id = Date.now().toString().slice(-6);
+            const dados = {
+                id,
+                dataEmissao: document.getElementById('campoDataEmissao').value,
+                dataValidade: document.getElementById('campoDataValidade').value,
+                cliente: document.getElementById('campoNomeCliente').value,
+                numeroPedido: document.getElementById('campoNumeroPedido').value,
+                valorOriginal: toF(mValor.value),
+                vendedor: document.getElementById('campoVendedor').value,
+                autorizador: document.getElementById('campoAutorizador').value,
+                observacao: document.getElementById('campoObservacao').value
+            };
+
+            try {
+                await database.ref('vales/' + id).set(dados);
+                this.reset(); 
+                resetDatas();
+                Swal.fire('Salvo!', 'Vale cadastrado com sucesso!', 'success');
+            } catch (erro) {
+                Swal.fire('Erro', 'Falha ao salvar o vale. Verifique a conexão.', 'error');
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = textoOriginal;
+            }
+        });
+
+        function abrirModalBaixa(id) {
+            const v = listaGlobalVales.find(x => String(x.id) === String(id));
+            if (!v) return;
+            const s = calcularSaldoRestante(v);
+            document.getElementById('idValeSendoBaixado').value = id;
+            document.getElementById('textoSaldoDisponivel').innerText = `Saldo: ${formatadorMoeda.format(s)}`;
+            mBaixa.value = s.toFixed(2).replace('.', ',');
+            document.getElementById('modalRealizarBaixa').classList.remove('hidden');
+        }
+
+        async function confirmarProcessoDeBaixa() {
+            const id = document.getElementById('idValeSendoBaixado').value;
+            const vUso = toF(mBaixa.value);
+            const nota = document.getElementById('campoNotaVendaBaixa').value.trim();
+            
+            const vale = listaGlobalVales.find(x => String(x.id) === String(id));
+            if (!vale) { Swal.fire('Erro', 'Vale não encontrado.', 'error'); return; }
+            
+            const saldoDisponivel = calcularSaldoRestante(vale);
+
+            if (!nota) { Swal.fire('Atenção', 'Número da nota obrigatório.', 'warning'); return; }
+            if (vUso <= 0) { Swal.fire('Atenção', 'Valor deve ser maior que R$ 0,00.', 'warning'); return; }
+            if (vUso > saldoDisponivel) { Swal.fire('Bloqueado', `Saldo insuficiente. Saldo: ${formatadorMoeda.format(saldoDisponivel)}.`, 'error'); return; }
+
+            const btnConfirmar = document.getElementById('btnConfirmarBaixa');
+            if (btnConfirmar.disabled) return;
+            const textoOriginal = btnConfirmar.innerHTML;
+            btnConfirmar.disabled = true;
+            btnConfirmar.innerHTML = 'Processando...';
+
+            try {
+                await database.ref(`vales/${id}/baixas`).push({ 
+                    dataBaixa: new Date().toISOString().split('T')[0], 
+                    valorUsado: vUso, 
+                    notaVenda: nota 
+                });
+                
+                document.getElementById('campoNotaVendaBaixa').value = '';
+                fecharModalBaixa();
+                Swal.fire('Sucesso!', 'Crédito utilizado com sucesso.', 'success');
+            } catch (erro) {
+                Swal.fire('Erro', 'Não foi possível salvar a baixa.', 'error');
+            } finally {
+                btnConfirmar.disabled = false;
+                btnConfirmar.innerHTML = textoOriginal;
+            }
+        }
+
+        async function solicitarExclusaoVale(id) {
+            if (!await validarSenhaMaster()) {
+                Swal.fire('Bloqueado', 'Senha incorreta. Acesso negado.', 'error');
+                return;
+            }
+
+            const confirmacao = await Swal.fire({
+                title: 'Confirmar Eliminação?',
+                text: `Apagar definitivamente o vale #${id}?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Sim, eliminar'
+            });
+
+            if (confirmacao.isConfirmed) {
+                try {
+                    await database.ref('vales/' + id).remove();
+                    renderPainel();
+                    Swal.fire('Eliminado!', 'Registro removido.', 'success');
+                } catch (erro) {
+                    Swal.fire('Erro', 'Falha na exclusão. Verifique a conexão.', 'error');
+                }
+            }
+        }
+
+        // ==========================================
+        // 8. PAINEL GERENCIAL E RENDERIZAÇÃO
+        // ==========================================
+        async function abrirPainelGerencial() {
+            if (await validarSenhaMaster()) {
+                renderPainel(); 
+                document.getElementById('modalPainelControle').classList.remove('hidden'); 
+            } else { 
+                Swal.fire('Acesso Negado', 'Senha incorreta.', 'error'); 
+            }
+        }
+
+        function definirFiltroStatus(status) {
+            filtroStatusAtual = (filtroStatusAtual === status) ? 'todos' : status;
+            atualizarTabelaPrincipal();
+        }
+
+        function atualizarTabelaPrincipal() {
+            const busca = document.getElementById('inputFiltroBusca').value.toLowerCase();
+            const corpo = document.getElementById('tabelaCorpoPrincipal');
+            corpo.innerHTML = '';
+            
+            let sNaoUtilizados = 0, qNaoUtilizados = 0;
+            let sParciais = 0, qParciais = 0;
+            let sBaixados = 0, qBaixados = 0;
+            let totalUtilizadoGeral = 0, totalPendenteGeral = 0;
+
+            listaGlobalVales.forEach(vale => {
+                const valorOrig = parseFloat(vale.valorOriginal) || parseFloat(vale.valor) || 0;
+                const saldo = calcularSaldoRestante(vale);
+                const baixas = vale.baixas ? Object.values(vale.baixas) : [];
+                const totalBaixadoNoVale = baixas.reduce((acc, b) => acc + (parseFloat(b.valorUsado) || 0), 0);
+
+                totalUtilizadoGeral += totalBaixadoNoVale;
+                totalPendenteGeral += saldo;
+
+                if (baixas.length === 0) { sNaoUtilizados += valorOrig; qNaoUtilizados++; } 
+                else if (saldo > 0) { sParciais += saldo; qParciais++; } 
+                else { sBaixados += valorOrig; qBaixados++; }
+            });
+
+            document.getElementById('somaNaoUtilizados').innerText = formatadorMoeda.format(sNaoUtilizados);
+            document.getElementById('qtdNaoUtilizados').innerText = `${qNaoUtilizados} vale(s) intacto(s)`;
+            document.getElementById('somaParciais').innerText = formatadorMoeda.format(sParciais);
+            document.getElementById('qtdParciais').innerText = `${qParciais} com saldo`;
+            document.getElementById('somaBaixados').innerText = formatadorMoeda.format(sBaixados);
+            document.getElementById('qtdBaixados').innerText = `${qBaixados} liquidado(s)`;
+            
+            document.getElementById('balancoUtilizadoTotal').innerText = formatadorMoeda.format(totalUtilizadoGeral);
+            document.getElementById('balancoPendenteTotal').innerText = formatadorMoeda.format(totalPendenteGeral);
+
+            document.getElementById('cardNaoUtilizados').className = `bg-slate-800 p-4 rounded-2xl border shadow-lg cursor-pointer transition-all duration-200 hover:border-blue-500 select-none border-2 ${filtroStatusAtual === 'nao_utilizados' ? 'border-blue-500' : 'border-slate-700'}`;
+            document.getElementById('cardParciais').className = `bg-slate-800 p-4 rounded-2xl border shadow-lg cursor-pointer transition-all duration-200 hover:border-blue-500 select-none border-2 ${filtroStatusAtual === 'parciais' ? 'border-amber-500' : 'border-slate-700'}`;
+            document.getElementById('cardBaixados').className = `bg-slate-800 p-4 rounded-2xl border shadow-lg cursor-pointer transition-all duration-200 hover:border-blue-500 select-none border-2 ${filtroStatusAtual === 'baixados' ? 'border-red-500' : 'border-slate-700'}`;
+
+            listaGlobalVales.filter(v => {
+                const atendeTexto = (v.cliente || "").toLowerCase().includes(busca) || (v.numeroPedido || v.numNota || "").includes(busca) || String(v.id || "").includes(busca);
+                if (!atendeTexto) return false;
+                const saldo = calcularSaldoRestante(v);
+                const nBaixas = v.baixas ? Object.keys(v.baixas).length : 0;
+                if (filtroStatusAtual === 'nao_utilizados') return nBaixas === 0;
+                if (filtroStatusAtual === 'parciais') return nBaixas > 0 && saldo > 0;
+                if (filtroStatusAtual === 'baixados') return saldo === 0;
+                return true;
+            }).reverse().forEach(vale => {
+                const s = calcularSaldoRestante(vale);
+                const vencido = s > 0 && verificarSeVencido(vale);
+                const badgeVencido = vencido ? `<span class="ml-1.5 px-1.5 py-0.5 text-[9px] font-bold rounded bg-amber-500/20 text-amber-400 border border-amber-500/40 uppercase tracking-wider inline-block">Vencido</span>` : '';
+
+                corpo.innerHTML += `
+                    <tr class="border-b border-slate-700/30 hover:bg-slate-800/40 transition">
+                        <td class="p-4 font-mono text-slate-400">#${escapeHtml(vale.id)}</td>
+                        <td class="font-bold">${escapeHtml(vale.cliente || "S/ Nome")}</td>
+                        <td class="font-bold ${s > 0 ? (vencido ? 'text-amber-400' : 'text-green-400') : 'text-red-400'}">
+                            ${formatadorMoeda.format(s)}${badgeVencido}
+                        </td>
+                        <td class="p-4 text-right space-x-1.5">
+                            <button onclick="abrirModalExtrato('${escapeHtml(vale.id)}')" title="Ver Extrato e Histórico" class="p-1.5 rounded hover:bg-slate-700 text-sm transition" aria-label="Extrato">📋</button>
+                            <button onclick="imprimirComprovanteVale('${escapeHtml(vale.id)}')" title="Imprimir Comprovante" class="p-1.5 rounded hover:bg-slate-700 text-sm transition" aria-label="Imprimir">🖨️</button>
+                            ${s > 0 ? `<button onclick="abrirModalBaixa('${escapeHtml(vale.id)}')" class="bg-green-600 hover:bg-green-500 px-3 py-1 rounded text-xs font-bold transition">UTILIZAR</button>` : ''}
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        function renderPainel() {
+            const corpo = document.getElementById('tabelaCorpoPainelCompleto');
+            corpo.innerHTML = '';
+            listaGlobalVales.forEach(v => {
+                const s = calcularSaldoRestante(v);
+                const vencido = s > 0 && verificarSeVencido(v);
+                const statusBadge = s > 0 
+                    ? (vencido ? '<span class="text-amber-400 font-bold">VENCIDO</span>' : '<span class="text-green-400 font-bold">ATIVO</span>')
+                    : '<span class="text-slate-400 font-bold">FINALIZADO</span>';
+
+                const nBaixas = v.baixas ? Object.keys(v.baixas).length : 0;
+
+                corpo.innerHTML += `
+                    <tr class="hover:bg-slate-850/50 transition">
+                        <td>#${escapeHtml(v.id)}</td>
+                        <td>${escapeHtml(fD(v.dataEmissao || v.dataVale))}</td>
+                        <td>${escapeHtml(fD(v.dataValidade || v.validade))}</td>
+                        <td class="font-semibold">${escapeHtml(v.cliente || "S/ Nome")}</td>
+                        <td>${statusBadge}</td>
+                        <td>${escapeHtml(v.numeroPedido || v.numNota || "-")}</td>
+                        <td>${formatadorMoeda.format(parseFloat(v.valorOriginal) || parseFloat(v.valor) || 0)}</td>
+                        <td class="font-bold ${s > 0 ? 'text-green-400' : 'text-slate-400'}">${formatadorMoeda.format(s)}</td>
+                        <td>${nBaixas}</td>
+                        <td>${escapeHtml(v.vendedor || v.quemFez || "-")}</td>
+                        <td>${escapeHtml(v.autorizador || v.responsavel || "-")}</td>
+                        <td class="max-w-[150px] truncate" title="${escapeHtml(v.observacao || v.devolvido || "-")}">${escapeHtml(v.observacao || v.devolvido || "-")}</td>
+                        <td class="text-center space-x-2">
+                            <button onclick="abrirModalExtrato('${escapeHtml(v.id)}')" title="Histórico / Extrato">📋</button>
+                            <button onclick="imprimirComprovanteVale('${escapeHtml(v.id)}')" title="Imprimir Comprovante">🖨️</button>
+                            <button onclick="solicitarExclusaoVale('${escapeHtml(v.id)}')" title="Excluir Registro">🗑️</button>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        // ==========================================
+        // 9. EXTRATO E DETALHES DE BAIXAS
+        // ==========================================
+        function abrirModalExtrato(id) {
+            const v = listaGlobalVales.find(x => String(x.id) === String(id));
+            if (!v) {
+                Swal.fire('Erro', 'Vale não encontrado.', 'error');
+                return;
+            }
+
+            const s = calcularSaldoRestante(v);
+            const valorOrig = parseFloat(v.valorOriginal) || parseFloat(v.valor) || 0;
+            const vencido = s > 0 && verificarSeVencido(v);
+            const baixas = v.baixas ? Object.values(v.baixas) : [];
+
+            document.getElementById('extratoValeId').innerText = `#${v.id}`;
+            document.getElementById('extratoCliente').innerHTML = `<strong>Cliente:</strong> ${escapeHtml(v.cliente || "S/ Nome")}`;
+            document.getElementById('extratoDataEmissao').innerText = fD(v.dataEmissao || v.dataVale);
+            document.getElementById('extratoDataValidade').innerText = fD(v.dataValidade || v.validade);
+            document.getElementById('extratoValorOriginal').innerText = formatadorMoeda.format(valorOrig);
+            
+            const elSaldo = document.getElementById('extratoSaldoAtual');
+            elSaldo.innerText = formatadorMoeda.format(s);
+            elSaldo.className = `text-sm font-bold mt-0.5 ${s > 0 ? (vencido ? 'text-amber-400' : 'text-green-400') : 'text-red-400'}`;
+
+            // Informações complementares
+            document.getElementById('extratoInfoComplementar').innerHTML = `
+                <div><strong>Nº Pedido/Nota Original:</strong> ${escapeHtml(v.numeroPedido || v.numNota || "-")}</div>
+                <div><strong>Vendedor:</strong> ${escapeHtml(v.vendedor || v.quemFez || "-")} | <strong>Autorizado por:</strong> ${escapeHtml(v.autorizador || v.responsavel || "-")}</div>
+                <div><strong>Motivo / Obs:</strong> ${escapeHtml(v.observacao || v.devolvido || "-")}</div>
+            `;
+
+            // Badge de Status
+            const badgeEl = document.getElementById('extratoStatusBadge');
+            if (s === 0) {
+                badgeEl.innerHTML = `<span class="px-2.5 py-1 rounded-full bg-red-500/20 text-red-400 border border-red-500/30">TOTALMENTE BAIXADO</span>`;
+            } else if (vencido) {
+                badgeEl.innerHTML = `<span class="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">VENCIDO COM SALDO</span>`;
+            } else if (baixas.length > 0) {
+                badgeEl.innerHTML = `<span class="px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">PARCIALMENTE UTILIZADO</span>`;
+            } else {
+                badgeEl.innerHTML = `<span class="px-2.5 py-1 rounded-full bg-green-500/20 text-green-400 border border-green-500/30">INTACTO / ATIVO</span>`;
+            }
+
+            // Tabela de Baixas
+            const corpo = document.getElementById('extratoCorpoBaixas');
+            corpo.innerHTML = '';
+
+            if (baixas.length === 0) {
+                corpo.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-slate-400 italic">Nenhuma baixa realizada até o momento. Saldo integral disponível.</td></tr>`;
+            } else {
+                baixas.forEach((b, index) => {
+                    const vUsado = parseFloat(b.valorUsado) || 0;
+                    corpo.innerHTML += `
+                        <tr class="hover:bg-slate-800/60 transition">
+                            <td class="p-3 text-slate-400 font-mono">#${index + 1}</td>
+                            <td class="p-3 text-slate-200">${escapeHtml(fD(b.dataBaixa))}</td>
+                            <td class="p-3 font-semibold text-slate-300">${escapeHtml(b.notaVenda || '-')}</td>
+                            <td class="p-3 text-right font-bold text-red-400">${formatadorMoeda.format(vUsado)}</td>
+                        </tr>
+                    `;
+                });
+            }
+
+            // Botão de impressão do vale
+            const btnPrint = document.getElementById('btnImprimirExtrato');
+            btnPrint.onclick = () => imprimirComprovanteVale(v.id);
+
+            document.getElementById('modalExtratoVale').classList.remove('hidden');
+        }
+
+        function fecharModalExtrato() {
+            document.getElementById('modalExtratoVale').classList.add('hidden');
+        }
+
+        // ==========================================
+        // 10. EXPORTAÇÃO CSV PARA CONTABILIDADE
+        // ==========================================
+        function exportarValesCSV() {
+            if (!listaGlobalVales || listaGlobalVales.length === 0) {
+                Swal.fire('Atenção', 'Não há registros para exportar.', 'info');
+                return;
+            }
+
+            const cabecalhos = [
+                'ID',
+                'Data Emissão',
+                'Validade',
+                'Cliente',
+                'Status',
+                'Pedido Original',
+                'Valor Original',
+                'Saldo Atual',
+                'Quantidade de Baixas',
+                'Vendedor',
+                'Autorizador'
+            ];
+
+            const formatarCampoCSV = (valor) => {
+                if (valor === null || valor === undefined) return '""';
+                const str = String(valor).replace(/"/g, '""');
+                return `"${str}"`;
+            };
+
+            const linhas = [cabecalhos.join(';')];
+
+            listaGlobalVales.forEach(v => {
+                const s = calcularSaldoRestante(v);
+                const vencido = s > 0 && verificarSeVencido(v);
+                const baixas = v.baixas ? Object.values(v.baixas) : [];
+                const nBaixas = baixas.length;
+
+                let statusTexto = 'FINALIZADO';
+                if (s > 0) {
+                    if (vencido) {
+                        statusTexto = 'VENCIDO';
+                    } else if (nBaixas > 0) {
+                        statusTexto = 'USO PARCIAL';
+                    } else {
+                        statusTexto = 'ATIVO';
+                    }
+                }
+
+                const valorOrig = parseFloat(v.valorOriginal) || parseFloat(v.valor) || 0;
+
+                const linha = [
+                    formatarCampoCSV(v.id || ''),
+                    formatarCampoCSV(fD(v.dataEmissao || v.dataVale)),
+                    formatarCampoCSV(fD(v.dataValidade || v.validade)),
+                    formatarCampoCSV(v.cliente || 'S/ Nome'),
+                    formatarCampoCSV(statusTexto),
+                    formatarCampoCSV(v.numeroPedido || v.numNota || '-'),
+                    formatarCampoCSV(valorOrig.toFixed(2).replace('.', ',')),
+                    formatarCampoCSV(s.toFixed(2).replace('.', ',')),
+                    formatarCampoCSV(nBaixas),
+                    formatarCampoCSV(v.vendedor || v.quemFez || '-'),
+                    formatarCampoCSV(v.autorizador || v.responsavel || '-')
+                ];
+
+                linhas.push(linha.join(';'));
+            });
+
+            // Adiciona BOM UTF-8 (\uFEFF) para garantir acentuação correta no Microsoft Excel
+            const csvString = '\uFEFF' + linhas.join('\r\n');
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.href = url;
+            link.download = `VALES_TUCANO_CONTABILIDADE_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        // ==========================================
+        // 11. EXPORTAÇÃO JSON, IMPORTAÇÃO E IMPRESSÃO
+        // ==========================================
+        async function gerarBackupDadosJSON() {
+            if (await validarSenhaMaster()) {
+                const blob = new Blob([JSON.stringify(listaGlobalVales, null, 2)], { type: 'application/json' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `BACKUP_TUCANO_${new Date().toISOString().split('T')[0]}.json`;
+                link.click();
+            } else {
+                Swal.fire('Erro', 'Senha incorreta.', 'error');
+            }
+        }
+
+        async function importarDadosJSON(e) {
+            if (!await validarSenhaMaster()) {
+                Swal.fire('Erro', 'Senha incorreta.', 'error');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = async (evento) => {
+                try {
+                    const dados = JSON.parse(evento.target.result);
+                    Swal.fire({ title: 'Processando...', text: 'Importando registros...', didOpen: () => Swal.showLoading() });
+                    for(let item of dados) await database.ref('vales/' + item.id).set(item);
+                    Swal.fire('Sucesso!', 'Dados sincronizados.', 'success');
+                } catch (err) {
+                    Swal.fire('Erro', 'Arquivo inválido.', 'error');
+                }
+            };
+            reader.readAsText(e.target.files[0]);
+        }
+
+        function imprimirComprovanteVale(id) {
+            const v = listaGlobalVales.find(x => String(x.id) === String(id));
+            if (!v) return;
+            const s = calcularSaldoRestante(v);
+            const motivoTexto = v.observacao || v.devolvido || "-";
+            const area = document.getElementById('areaImpressaoFinal');
+            
+            // Histórico de utilizações prévias
+            const baixasArr = v.baixas ? Object.values(v.baixas) : [];
+            let historicoBaixasHtml = '';
+            if (baixasArr.length > 0) {
+                const ultimaBaixa = baixasArr[baixasArr.length - 1];
+                const dataUltima = fD(ultimaBaixa.dataBaixa);
+                const listaBaixasCompacta = baixasArr.map((b, idx) => 
+                    `[#${idx + 1}] ${fD(b.dataBaixa)}: ${formatadorMoeda.format(parseFloat(b.valorUsado) || 0)} (NF: ${escapeHtml(b.notaVenda || '-')})`
+                ).join(' &nbsp;|&nbsp; ');
+
+                historicoBaixasHtml = `
+                    <div style="margin:4px 0; padding:4px 6px; border:1px dashed #666; background:#f8fafc; font-size:9px !important; line-height:1.2 !important;">
+                        <strong>BAIXAS ANTERIORES (${baixasArr.length} utilização${baixasArr.length > 1 ? 'ões' : ''} - Última: ${dataUltima}):</strong><br>
+                        <span style="font-size:8.5px !important; color:#333;">${listaBaixasCompacta}</span>
+                    </div>`;
+            }
+
+            area.innerHTML = `
+                <div class="vale-print">
+                    <div style="text-align:center; border-bottom:1px solid #000; padding-bottom:5px;">
+                        <h1 style="margin:0;">VALE CRÉDITO TUCANO AUTO PEÇAS</h1>
+                        <p style="margin:0; font-size:10px !important;">Comprovante de Crédito ao Consumidor</p>
+                    </div>
+                    <div style="margin:5px 0; display:flex; justify-content:space-between;">
+                        <span><strong>Nº CONTROLE:</strong> #${escapeHtml(v.id)}</span>
+                        <span><strong>EMISSÃO:</strong> ${escapeHtml(fD(v.dataEmissao || v.dataVale))}</span>
+                    </div>
+                    <div style="margin:2px 0;"><strong>CLIENTE:</strong> ${escapeHtml(v.cliente ? v.cliente.toUpperCase() : "S/ NOME")}</div>
+                    <div class="valor-box"><div style="font-size:10px; font-weight:bold;">VALOR DISPONÍVEL</div><div class="valor-texto">${formatadorMoeda.format(s)}</div></div>
+                    <div style="display:flex; justify-content:space-between;">
+                        <span><strong>Pedido/Orçamento:</strong> ${escapeHtml(v.numeroPedido || v.numNota || "-")}</span>
+                        <span><strong>Validade:</strong> ${escapeHtml(fD(v.dataValidade || v.validade))}</span>
+                    </div>
+                    <div style="margin:6px 0; min-height: 25px;"><strong>REFERENTE A:</strong><br><div style="font-size:11px; text-transform: uppercase;">${escapeHtml(motivoTexto)}</div></div>
+                    ${historicoBaixasHtml}
+                    <div style="font-size:8px !important; font-style:italic; border-top:1px solid #eee; padding-top:3px; margin-top: 5px;">* Este vale é nominal e deve ser apresentado na próxima compra. Sem valor em dinheiro.</div>
+                    <div style="display:flex; justify-content:space-between; margin-top:auto;">
+                        <div class="linha-assinatura">Tucano Auto Peças<br>Carimbo e Assinatura</div>
+                        <div class="linha-assinatura">${escapeHtml(v.cliente ? v.cliente.toUpperCase() : "CLIENTE")}<br>Assinatura do Cliente</div>
+                    </div>
+                </div>`;
+            setTimeout(() => { window.print(); }, 300);
+        }
+
+        // ==========================================
+        // 12. CONTROLE DE SENHA MASTER LOCAL
+        // ==========================================
+        async function alterarSenhaMaster() {
+            const novaSenha = document.getElementById('campoNovaSenhaMaster').value.trim();
+            
+            if (!novaSenha) {
+                Swal.fire('Atenção', 'Digite a nova senha no campo antes de alterar.', 'warning');
+                return;
+            }
+
+            // Salva a nova senha no armazenamento nativo e limpa o campo
+            localStorage.setItem('senhaMasterTucano', novaSenha);
+            document.getElementById('campoNovaSenhaMaster').value = '';
+            
+            Swal.fire('Sucesso', 'Senha master alterada com sucesso neste dispositivo!', 'success');
+        }
+
+        function fecharModalPainel() { document.getElementById('modalPainelControle').classList.add('hidden'); }
+        function fecharModalBaixa() { document.getElementById('modalRealizarBaixa').classList.add('hidden'); }
+        
+        function resetDatas() { 
+            document.getElementById('campoDataEmissao').valueAsDate = new Date(); 
+            const val = new Date(); 
+            val.setMonth(val.getMonth() + 3); 
+            document.getElementById('campoDataValidade').valueAsDate = val; 
+        }
+        
+        resetDatas();
+    </script>
+</body>
+</html>
