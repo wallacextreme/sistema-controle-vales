@@ -330,9 +330,11 @@
 
                         <!-- TOTALIZADOR GERAL -->
                         <div class="bg-slate-800/40 border border-slate-700/60 rounded-xl p-3 flex flex-wrap justify-between items-center text-xs gap-3 shadow-inner">
-                            <div class="text-slate-300">Total a Receber (Saldo Pendente): <span id="balancoNotasPendenteTotal" class="font-bold text-amber-400 ml-1">R$ 0,00</span></div>
+                            <div class="text-slate-300">Total a Receber: <span id="balancoNotasPendenteTotal" class="font-bold text-amber-400 ml-1">R$ 0,00</span></div>
                             <div class="text-slate-300">Total Já Recebido: <span id="balancoNotasRecebidoTotal" class="font-bold text-emerald-400 ml-1">R$ 0,00</span></div>
-                            <div class="text-slate-300">Total Emitido em Notas: <span id="balancoNotasEmitidoTotal" class="font-bold text-blue-400 ml-1">R$ 0,00</span></div>
+                            <div class="text-slate-300">Emitido Bruto: <span id="balancoNotasEmitidoBruto" class="font-bold text-slate-200 ml-1">R$ 0,00</span></div>
+                            <div class="text-slate-300">(-) Cancelado: <span id="balancoNotasCancelado" class="font-bold text-rose-400 ml-1">R$ 0,00</span></div>
+                            <div class="text-slate-300">= Emitido Líquido: <span id="balancoNotasEmitidoTotal" class="font-bold text-blue-400 ml-1">R$ 0,00</span></div>
                         </div>
 
                         <!-- BUSCA E FILTROS RÁPIDOS -->
@@ -1633,70 +1635,74 @@
         // Conjunto de controle em memória para prevenção de clique duplo/duplo envio
         const operacoesBaixaEmAndamento = new Set();
 
-        async function gerarNumeroControleNotaUnico() {
-            const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-            let tentativas = 0;
-            while (tentativas < 50) {
-                let codigo = '';
-                for (let i = 0; i < 8; i++) {
-                    codigo += chars.charAt(Math.floor(Math.random() * chars.length));
-                }
-                const candidato = `NP-${codigo}`;
-
-                // 1. Checagem em memória local sincronizada
-                const existeLocal = listaGlobalNotasPrazo.some(n => n.numeroControle === candidato);
-                if (existeLocal) {
-                    tentativas++;
-                    continue;
-                }
-
-                // 2. Checagem direta no Firebase Realtime Database
-                try {
-                    const snap = await database.ref('notasPrazo')
-                        .orderByChild('numeroControle')
-                        .equalTo(candidato)
-                        .once('value');
-                    if (!snap.exists()) {
-                        return candidato;
+        function descobrirMaiorNumeroNotaExistente() {
+            let max = 0;
+            if (Array.isArray(listaGlobalNotasPrazo)) {
+                listaGlobalNotasPrazo.forEach(n => {
+                    if (n && n.numeroControle) {
+                        const match = String(n.numeroControle).match(/^NP-(\d+)$/i);
+                        if (match) {
+                            const num = parseInt(match[1], 10);
+                            if (!isNaN(num) && num > max) max = num;
+                        }
                     }
-                } catch (e) {
-                    // Se a consulta indexada offline falhar, a verificação local garante segurança
-                    return candidato;
-                }
-                tentativas++;
+                });
             }
-            // Fallback criptográfico com timestamp para garantia absoluta de unicidade
-            const extra = Date.now().toString(36).toUpperCase().slice(-4);
-            return `NP-${extra}${Math.floor(Math.random() * 8999 + 1000)}`;
+            return max;
         }
 
-        async function gerarNumeroReciboUnico() {
-            const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-            let tentativas = 0;
-            while (tentativas < 50) {
-                let codigo = '';
-                for (let i = 0; i < 8; i++) {
-                    codigo += chars.charAt(Math.floor(Math.random() * chars.length));
-                }
-                const candidato = `REC-${codigo}`;
-
-                // Verifica unicidade em todos os pagamentos de todas as notas em memória
-                let existe = false;
-                for (const nota of listaGlobalNotasPrazo) {
+        function descobrirMaiorNumeroReciboExistente() {
+            let max = 0;
+            if (Array.isArray(listaGlobalNotasPrazo)) {
+                listaGlobalNotasPrazo.forEach(nota => {
                     const pagtos = extrairPagamentosNota(nota);
-                    if (pagtos.some(p => p.numeroRecibo === candidato)) {
-                        existe = true;
-                        break;
-                    }
-                }
-                if (!existe) {
-                    return candidato;
-                }
-                tentativas++;
+                    pagtos.forEach(p => {
+                        if (p && p.numeroRecibo) {
+                            const match = String(p.numeroRecibo).match(/^REC-(\d+)$/i);
+                            if (match) {
+                                const num = parseInt(match[1], 10);
+                                if (!isNaN(num) && num > max) max = num;
+                            }
+                        }
+                    });
+                });
             }
-            const extra = Date.now().toString(36).toUpperCase().slice(-4);
-            return `REC-${extra}${Math.floor(Math.random() * 8999 + 1000)}`;
+            return max;
         }
+
+        async function obterProximoNumeroControleNota() {
+            const seqRef = database.ref('sequencias/notasPrazo');
+            const maxLocal = descobrirMaiorNumeroNotaExistente();
+            const res = await seqRef.transaction((atual) => {
+                const atualNum = (atual !== null && atual !== undefined && !isNaN(Number(atual))) ? Number(atual) : 0;
+                const base = Math.max(atualNum, maxLocal);
+                return base + 1;
+            });
+            if (!res.committed || !res.snapshot) {
+                throw new Error('Falha na transação atômica do contador sequencial de Nota a Prazo.');
+            }
+            const valorSeq = res.snapshot.val();
+            return `NP-${String(valorSeq).padStart(6, '0')}`;
+        }
+
+        async function obterProximoNumeroRecibo() {
+            const seqRef = database.ref('sequencias/recibos');
+            const maxLocal = descobrirMaiorNumeroReciboExistente();
+            const res = await seqRef.transaction((atual) => {
+                const atualNum = (atual !== null && atual !== undefined && !isNaN(Number(atual))) ? Number(atual) : 0;
+                const base = Math.max(atualNum, maxLocal);
+                return base + 1;
+            });
+            if (!res.committed || !res.snapshot) {
+                throw new Error('Falha na transação atômica do contador sequencial de Recibo.');
+            }
+            const valorSeq = res.snapshot.val();
+            return `REC-${String(valorSeq).padStart(6, '0')}`;
+        }
+
+        // Aliases para total compatibilidade retroativa
+        const gerarNumeroControleNotaUnico = obterProximoNumeroControleNota;
+        const gerarNumeroReciboUnico = obterProximoNumeroRecibo;
 
         function extrairPagamentosNota(nota) {
             if (!nota || !nota.pagamentos) return [];
@@ -1899,7 +1905,9 @@
 
             let totalPendenteGeral = 0;
             let totalRecebidoGeral = 0;
-            let totalEmitidoGeral = 0;
+            let totalEmitidoBruto = 0;
+            let totalCancelado = 0;
+            let totalEmitidoLiquido = 0;
 
             const hojeStr = new Date().toISOString().split('T')[0];
 
@@ -1907,12 +1915,15 @@
                 const sit = calcularSituacaoNota(nota);
                 const valorOrig = parseFloat(nota.valorOriginal) || 0;
 
+                totalEmitidoBruto += valorOrig;
+
                 // Notas canceladas são excluídas das métricas ativas de contas a receber
                 if (sit.statusFinanceiro === 'CANCELADA') {
+                    totalCancelado += valorOrig;
                     return;
                 }
 
-                totalEmitidoGeral += valorOrig;
+                totalEmitidoLiquido += valorOrig;
                 totalRecebidoGeral += sit.totalRecebido;
                 totalPendenteGeral += sit.saldo;
 
@@ -1966,7 +1977,13 @@
 
             document.getElementById('balancoNotasPendenteTotal').innerText = formatadorMoeda.format(totalPendenteGeral);
             document.getElementById('balancoNotasRecebidoTotal').innerText = formatadorMoeda.format(totalRecebidoGeral);
-            document.getElementById('balancoNotasEmitidoTotal').innerText = formatadorMoeda.format(totalEmitidoGeral);
+            if (document.getElementById('balancoNotasEmitidoBruto')) {
+                document.getElementById('balancoNotasEmitidoBruto').innerText = formatadorMoeda.format(totalEmitidoBruto);
+            }
+            if (document.getElementById('balancoNotasCancelado')) {
+                document.getElementById('balancoNotasCancelado').innerText = formatadorMoeda.format(totalCancelado);
+            }
+            document.getElementById('balancoNotasEmitidoTotal').innerText = formatadorMoeda.format(totalEmitidoLiquido);
 
             const cards = {
                 'ABERTA': { id: 'cardNotaAberta', cor: 'border-blue-500' },
@@ -2203,9 +2220,39 @@
             }
 
             try {
+                // 1.1 Verificação prévia de Idempotência para preservar número de sequência em retry
+                const notaLocal = listaGlobalNotasPrazo.find(x => String(x.id) === String(id));
+                let duplicadoExistente = null;
+                if (notaLocal) {
+                    const pagtosLocais = extrairPagamentosNota(notaLocal);
+                    duplicadoExistente = pagtosLocais.find(p => p && p.idempotencyKey === chaveIdempotencia);
+                }
+                if (!duplicadoExistente) {
+                    try {
+                        const snapP = await database.ref(`notasPrazo/${id}/pagamentos`).once('value');
+                        if (snapP.exists()) {
+                            const valP = snapP.val();
+                            duplicadoExistente = Object.values(valP).find(p => p && p.idempotencyKey === chaveIdempotencia);
+                        }
+                    } catch (eSnap) {
+                        // Prossegue se consulta rápida falhar
+                    }
+                }
+
+                if (duplicadoExistente) {
+                    fecharModalBaixaNota();
+                    Swal.fire({
+                        title: 'Pagamento Já Confirmado!',
+                        html: `Este pagamento já havia sido processado.<br>Recibo: <strong>${duplicadoExistente.numeroRecibo}</strong>.`,
+                        icon: 'info'
+                    });
+                    return;
+                }
+
                 const operadorAtual = (auth.currentUser && auth.currentUser.email) ? auth.currentUser.email : 'Operador';
+                const timestampOperacao = new Date().toISOString();
                 const idPagamento = database.ref(`notasPrazo/${id}/pagamentos`).push().key;
-                const numeroRecibo = await gerarNumeroReciboUnico();
+                const numeroRecibo = await obterProximoNumeroRecibo();
 
                 const dadosPagamento = {
                     id: idPagamento,
@@ -2216,7 +2263,7 @@
                     formaPagamento: formaPagto,
                     observacao: obsPagto,
                     status: 'ATIVO',
-                    criadoEm: new Date().toISOString(),
+                    criadoEm: timestampOperacao,
                     criadoPor: operadorAtual
                 };
 
@@ -2284,7 +2331,7 @@
 
                     notaAtual.pagamentos[idPagamento] = dadosPagamento;
                     notaAtual.status = (novoSaldo <= 0.001) ? 'QUITADA' : 'PARCIAL';
-                    notaAtual.atualizadoEm = new Date().toISOString();
+                    notaAtual.atualizadoEm = timestampOperacao;
                     notaAtual.atualizadoPor = operadorAtual;
 
                     return notaAtual;
@@ -2377,16 +2424,48 @@
 
             if (motivo) {
                 const operadorAtual = (auth.currentUser && auth.currentUser.email) ? auth.currentUser.email : 'Operador';
-                const updates = {};
-                updates[`notasPrazo/${id}/status`] = 'CANCELADA';
-                updates[`notasPrazo/${id}/canceladaEm`] = new Date().toISOString();
-                updates[`notasPrazo/${id}/canceladaPor`] = operadorAtual;
-                updates[`notasPrazo/${id}/motivoCancelamento`] = motivo.trim();
-                updates[`notasPrazo/${id}/atualizadoEm`] = new Date().toISOString();
-                updates[`notasPrazo/${id}/atualizadoPor`] = operadorAtual;
+                const agora = new Date().toISOString();
+                const refNota = database.ref('notasPrazo/' + id);
 
+                let motivoRejeicao = null;
                 try {
-                    await database.ref().update(updates);
+                    const resTransacao = await refNota.transaction((notaAtual) => {
+                        if (!notaAtual) return notaAtual;
+
+                        if (notaAtual.status === 'CANCELADA' || notaAtual.statusCancelamento === 'CANCELADA') {
+                            motivoRejeicao = 'JA_CANCELADA';
+                            return; // aborta transação
+                        }
+
+                        // Verificação de segurança: nota totalmente quitada não deve ser cancelada diretamente
+                        const sit = calcularSituacaoNota(notaAtual);
+                        if (sit.statusFinanceiro === 'QUITADA') {
+                            motivoRejeicao = 'QUITADA';
+                            return; // aborta transação
+                        }
+
+                        notaAtual.status = 'CANCELADA';
+                        notaAtual.statusCancelamento = 'CANCELADA';
+                        notaAtual.canceladaEm = agora;
+                        notaAtual.canceladaPor = operadorAtual;
+                        notaAtual.motivoCancelamento = motivo.trim();
+                        notaAtual.atualizadoEm = agora;
+                        notaAtual.atualizadoPor = operadorAtual;
+
+                        return notaAtual;
+                    });
+
+                    if (!resTransacao.committed) {
+                        if (motivoRejeicao === 'JA_CANCELADA') {
+                            Swal.fire('Aviso', 'Esta nota já foi cancelada por outro usuário.', 'info');
+                        } else if (motivoRejeicao === 'QUITADA') {
+                            Swal.fire('Bloqueado', 'Esta nota já foi totalmente quitada e não pode ser cancelada diretamente.', 'warning');
+                        } else {
+                            Swal.fire('Aviso', 'Concorrência detectada durante o cancelamento. Revise os dados e tente novamente.', 'warning');
+                        }
+                        return;
+                    }
+
                     Swal.fire('Nota Cancelada', 'A nota foi marcada como cancelada. O histórico e pagamentos foram preservados.', 'success');
                 } catch (err) {
                     console.error(err);
@@ -2433,16 +2512,26 @@
             if (!motivo) return;
 
             const operadorAtual = (auth.currentUser && auth.currentUser.email) ? auth.currentUser.email : 'Operador';
+            const agora = new Date().toISOString();
             const refNota = database.ref('notasPrazo/' + idNota);
 
+            let motivoRejeicaoEstorno = null;
             try {
-                await refNota.transaction((notaAtual) => {
+                const resTransacao = await refNota.transaction((notaAtual) => {
                     if (!notaAtual) return notaAtual;
-                    if (!notaAtual.pagamentos || !notaAtual.pagamentos[idPagamento]) return notaAtual;
+                    if (!notaAtual.pagamentos || !notaAtual.pagamentos[idPagamento]) {
+                        motivoRejeicaoEstorno = 'NAO_ENCONTRADO';
+                        return; // aborta
+                    }
 
                     const pAtual = notaAtual.pagamentos[idPagamento];
+                    if (pAtual.status === 'ESTORNADO') {
+                        motivoRejeicaoEstorno = 'JA_ESTORNADO';
+                        return; // aborta sem alterar
+                    }
+
                     pAtual.status = 'ESTORNADO';
-                    pAtual.estornadoEm = new Date().toISOString();
+                    pAtual.estornadoEm = agora;
                     pAtual.estornadoPor = operadorAtual;
                     pAtual.motivoEstorno = motivo.trim();
 
@@ -2451,11 +2540,22 @@
                     if (notaAtual.status !== 'CANCELADA') {
                         notaAtual.status = sit.statusFinanceiro;
                     }
-                    notaAtual.atualizadoEm = new Date().toISOString();
+                    notaAtual.atualizadoEm = agora;
                     notaAtual.atualizadoPor = operadorAtual;
 
                     return notaAtual;
                 });
+
+                if (!resTransacao.committed) {
+                    if (motivoRejeicaoEstorno === 'JA_ESTORNADO') {
+                        Swal.fire('Aviso', 'Este pagamento já havia sido estornado por outro usuário.', 'info');
+                    } else if (motivoRejeicaoEstorno === 'NAO_ENCONTRADO') {
+                        Swal.fire('Erro', 'Pagamento não localizado na nota.', 'error');
+                    } else {
+                        Swal.fire('Aviso', 'Concorrência detectada durante o estorno. Tente novamente.', 'warning');
+                    }
+                    return;
+                }
 
                 Swal.fire('Estorno Realizado', 'O pagamento foi estornado com sucesso. Histórico mantido e saldo recalculado.', 'success');
             } catch (err) {

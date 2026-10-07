@@ -35,3 +35,10 @@ firebase-config.js
 src-tauri/target/
 /src-tauri/target/
 target/
+
+# Backups e Dumps Financeiros (NUNCA COMMITAR)
+*backup*.json
+*BACKUP*.json
+BACKUP_REAL_*.json
+*.dump
+*.dump.json

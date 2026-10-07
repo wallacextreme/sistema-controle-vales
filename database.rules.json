@@ -1,0 +1,79 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "vales": {
+      ".read": "auth != null",
+      "$valeId": {
+        ".write": "auth != null",
+        ".validate": "newData.hasChildren(['id']) && (newData.hasChildren(['valorOriginal']) || newData.hasChildren(['valor']))",
+        "id": {
+          ".validate": "newData.isString() && (!data.exists() || newData.val() === data.val())"
+        },
+        "valorOriginal": {
+          ".validate": "!newData.exists() || (newData.isNumber() && newData.val() > 0)"
+        },
+        "valor": {
+          ".validate": "!newData.exists() || (newData.isNumber() && newData.val() > 0) || newData.isString()"
+        },
+        "baixas": {
+          "$baixaId": {
+            ".validate": "newData.hasChildren(['valorUsado'])",
+            "valorUsado": {
+              ".validate": "(newData.isNumber() && newData.val() > 0) || newData.isString()"
+            }
+          }
+        }
+      }
+    },
+
+    "notasPrazo": {
+      ".read": "auth != null",
+      ".indexOn": ["numeroControle", "cliente", "dataVencimento", "status"],
+      "$notaId": {
+        ".write": "auth != null",
+        ".validate": "newData.hasChildren(['id', 'valorOriginal', 'dataEmissao'])",
+        "id": {
+          ".validate": "newData.isString() && (!data.exists() || newData.val() === data.val())"
+        },
+        "numeroControle": {
+          ".validate": "newData.isString() && (!data.exists() || newData.val() === data.val())"
+        },
+        "valorOriginal": {
+          ".validate": "newData.isNumber() && newData.val() > 0 && (!data.exists() || newData.val() === data.val())"
+        },
+        "status": {
+          ".validate": "newData.isString() && (newData.val() === 'ABERTA' || newData.val() === 'PARCIAL' || newData.val() === 'QUITADA' || newData.val() === 'CANCELADA')"
+        },
+        "pagamentos": {
+          "$pagtoId": {
+            ".validate": "newData.hasChildren(['id', 'valor', 'numeroRecibo'])",
+            "id": {
+              ".validate": "newData.isString() && (!data.exists() || newData.val() === data.val())"
+            },
+            "valor": {
+              ".validate": "newData.isNumber() && newData.val() > 0 && (!data.exists() || newData.val() === data.val())"
+            },
+            "numeroRecibo": {
+              ".validate": "newData.isString() && (!data.exists() || newData.val() === data.val())"
+            },
+            "status": {
+              ".validate": "newData.isString() && (newData.val() === 'ATIVO' || newData.val() === 'ESTORNADO')"
+            }
+          }
+        }
+      }
+    },
+
+    "sequencias": {
+      ".read": "auth != null",
+      "notasPrazo": {
+        ".write": "auth != null && newData.isNumber() && (!data.exists() || newData.val() > data.val())"
+      },
+      "recibos": {
+        ".write": "auth != null && newData.isNumber() && (!data.exists() || newData.val() > data.val())"
+      }
+    }
+  }
+}

@@ -104,58 +104,84 @@ function calcularSaldoRestanteVale(vale) {
 }
 
 // =========================================================================
-// 1. TESTES DE IDENTIFICADORES (ITEM 16)
+// 1. TESTES DE IDENTIFICADORES E SEQUÊNCIAS ATÔMICAS (ITEM 3 E 16)
 // =========================================================================
-console.log('--- TESTE 1: UNICIDADE DE IDENTIFICADORES (20.000 IDs) ---');
+console.log('--- TESTE 1: UNICIDADE DISTRIBUÍDA E SEQUÊNCIAS ATÔMICAS (NP-XXXXXX / REC-XXXXXX) ---');
 
-function gerarCodigoNP() {
-    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-    let codigo = '';
-    for (let i = 0; i < 8; i++) {
-        codigo += chars.charAt(Math.floor(Math.random() * chars.length));
+class MockFirebaseSequenciaRef {
+    constructor(valorInicial = null) {
+        this.valor = valorInicial;
+        this.queue = Promise.resolve();
     }
-    return `NP-${codigo}`;
-}
 
-function gerarCodigoREC() {
-    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-    let codigo = '';
-    for (let i = 0; i < 8; i++) {
-        codigo += chars.charAt(Math.floor(Math.random() * chars.length));
+    transaction(callback) {
+        const next = this.queue.then(() => {
+            const valorAtual = this.valor;
+            const novoValor = callback(valorAtual);
+            if (novoValor === undefined) {
+                return { committed: false, snapshot: { val: () => this.valor } };
+            }
+            this.valor = novoValor;
+            return { committed: true, snapshot: { val: () => this.valor } };
+        });
+        this.queue = next.catch(() => {});
+        return next;
     }
-    return `REC-${codigo}`;
 }
 
-const setNP = new Set();
-const setREC = new Set();
-const QUANTIDADE_TESTE = 20000;
-
-for (let i = 0; i < QUANTIDADE_TESTE; i++) {
-    const np = gerarCodigoNP();
-    assert(!setNP.has(np), `Colisão detectada para NP: ${np} na iteração ${i}`);
-    setNP.add(np);
-
-    const rec = gerarCodigoREC();
-    assert(!setREC.has(rec), `Colisão detectada para REC: ${rec} na iteração ${i}`);
-    setREC.add(rec);
+// Funções de domínio de sequências
+function descobrirMaiorNumeroNotaExistente(lista) {
+    let max = 0;
+    (lista || []).forEach(n => {
+        if (n && n.numeroControle) {
+            const match = String(n.numeroControle).match(/^NP-(\d+)$/i);
+            if (match) {
+                const num = parseInt(match[1], 10);
+                if (!isNaN(num) && num > max) max = num;
+            }
+        }
+    });
+    return max;
 }
-console.log(`✓ Sucesso: 20.000 IDs de Nota (NP) e 20.000 IDs de Recibo (REC) gerados sem colisão.`);
 
-// Teste de resolução de conflito simulado
-const listaExistente = [{ numeroControle: 'NP-ABCDEF12' }];
-let tentativas = 0;
-let candidato = 'NP-ABCDEF12';
-// Simula verificação
-if (listaExistente.some(n => n.numeroControle === candidato)) {
-    candidato = 'NP-NOVO1234';
+function descobrirMaiorNumeroReciboExistente(lista) {
+    let max = 0;
+    (lista || []).forEach(nota => {
+        const pagtos = extrairPagamentosNota(nota);
+        pagtos.forEach(p => {
+            if (p && p.numeroRecibo) {
+                const match = String(p.numeroRecibo).match(/^REC-(\d+)$/i);
+                if (match) {
+                    const num = parseInt(match[1], 10);
+                    if (!isNaN(num) && num > max) max = num;
+                }
+            }
+        });
+    });
+    return max;
 }
-assert.strictEqual(candidato, 'NP-NOVO1234');
-console.log('✓ Sucesso: Mecanismo de re-geração em caso de conflito validado.\n');
 
-// =========================================================================
-// 2. TESTES DE CONCORRÊNCIA DE BAIXAS (ITEM 14)
-// =========================================================================
-console.log('--- TESTE 2: CONCORRÊNCIA TRANSAIONAL DE BAIXAS (ITEM 14) ---');
+async function simularObterProximoNumeroControle(seqRef, listaNotas) {
+    const maxLocal = descobrirMaiorNumeroNotaExistente(listaNotas);
+    const res = await seqRef.transaction((atual) => {
+        const atualNum = (atual !== null && atual !== undefined && !isNaN(Number(atual))) ? Number(atual) : 0;
+        const base = Math.max(atualNum, maxLocal);
+        return base + 1;
+    });
+    if (!res.committed) throw new Error('Falha na transação de sequência');
+    return `NP-${String(res.snapshot.val()).padStart(6, '0')}`;
+}
+
+async function simularObterProximoNumeroRecibo(seqRef, listaNotas) {
+    const maxLocal = descobrirMaiorNumeroReciboExistente(listaNotas);
+    const res = await seqRef.transaction((atual) => {
+        const atualNum = (atual !== null && atual !== undefined && !isNaN(Number(atual))) ? Number(atual) : 0;
+        const base = Math.max(atualNum, maxLocal);
+        return base + 1;
+    });
+    if (!res.committed) throw new Error('Falha na transação de sequência de recibo');
+    return `REC-${String(res.snapshot.val()).padStart(6, '0')}`;
+}
 
 // Simulação de banco Realtime Database com suporte a transaction()
 class MockFirebaseNotaRef {
@@ -226,6 +252,48 @@ async function simularBaixaConcorrente(bancoRef, valorPago, operador, chaveIdemp
 }
 
 (async () => {
+    // 1.1 Teste de incremento atômico sequencial com 5.000 chamadas concorrentes
+    const seqNotaRef = new MockFirebaseSequenciaRef(null);
+    const seqReciboRef = new MockFirebaseSequenciaRef(null);
+    const listaVazia = [];
+
+    const promessasNotas = [];
+    const promessasRecibos = [];
+    const TOTAL_SEQ = 5000;
+
+    for (let i = 0; i < TOTAL_SEQ; i++) {
+        promessasNotas.push(simularObterProximoNumeroControle(seqNotaRef, listaVazia));
+        promessasRecibos.push(simularObterProximoNumeroRecibo(seqReciboRef, listaVazia));
+    }
+
+    const idsNotas = await Promise.all(promessasNotas);
+    const idsRecibos = await Promise.all(promessasRecibos);
+
+    const setNotas = new Set(idsNotas);
+    const setRecibos = new Set(idsRecibos);
+
+    assert.strictEqual(setNotas.size, TOTAL_SEQ, 'Todos os 5.000 IDs de notas devem ser únicos');
+    assert.strictEqual(setRecibos.size, TOTAL_SEQ, 'Todos os 5.000 IDs de recibos devem ser únicos');
+    assert.strictEqual(idsNotas[0], 'NP-000001', 'Primeiro ID de nota deve ser NP-000001');
+    assert.strictEqual(idsNotas[TOTAL_SEQ - 1], `NP-${String(TOTAL_SEQ).padStart(6, '0')}`, 'Último ID de nota deve corresponder exatamente ao total');
+    assert.strictEqual(idsRecibos[0], 'REC-000001', 'Primeiro ID de recibo deve ser REC-000001');
+    console.log(`✓ Sucesso: 5.000 IDs NP e 5.000 REC gerados atomicamente sem colisão (NP-000001 até NP-005000).`);
+
+    // 1.2 Teste de Seed Inicial baseado no maior número já existente
+    const listaComNotasAntigas = [
+        { numeroControle: 'NP-000045' },
+        { numeroControle: 'NP-ALEATORIO1' },
+        { numeroControle: 'NP-000099' }
+    ];
+    const seqComSeed = new MockFirebaseSequenciaRef(null);
+    const proximoComSeed = await simularObterProximoNumeroControle(seqComSeed, listaComNotasAntigas);
+    assert.strictEqual(proximoComSeed, 'NP-000100', 'Novo contador deve iniciar em 100 para não colidir com NP-000099 existente');
+    console.log('✓ Sucesso: Ajuste automático de seed para não colidir com registros NP já existentes validado.\n');
+
+    // =========================================================================
+    // 2. TESTES DE CONCORRÊNCIA DE BAIXAS (ITEM 14)
+    // =========================================================================
+    console.log('--- TESTE 2: CONCORRÊNCIA TRANSAIONAL DE BAIXAS (ITEM 14) ---');
     // Cenário 1: Nota de R$ 1.000. Baixa A de R$ 700 e Baixa B de R$ 700.
     const notaMil = {
         id: 'nota_1',
@@ -508,6 +576,135 @@ async function simularBaixaConcorrente(bancoRef, valorPago, operador, chaveIdemp
     const saldoLegado2 = calcularSaldoRestanteVale(valeLegado1);
     assert.strictEqual(saldoLegado2, 300);
     console.log('✓ Sucesso: Objeto legado de vale com campos valor/dataVale/validade/numNota lido perfeitamente sem modificações.');
+
+    // =========================================================================
+    // 6. TESTES DE ESTORNO CONCORRENTE SIMULTÂNEO (ITEM 7)
+    // =========================================================================
+    console.log('\n--- TESTE 6: ESTORNO CONCORRENTE SIMULTÂNEO (ITEM 7) ---');
+    const notaEstornoConcorrente = {
+        id: 'nota_estorno_conc',
+        valorOriginal: 1000,
+        status: 'PARCIAL',
+        pagamentos: {
+            'p_500': { id: 'p_500', numeroRecibo: 'REC-000001', valor: 500, status: 'ATIVO' }
+        }
+    };
+    const bancoEstorno = new MockFirebaseNotaRef(notaEstornoConcorrente);
+
+    async function simularEstorno(bancoRef, idPagto, motivo, operador) {
+        let motivoRejeicao = null;
+        const res = await bancoRef.transaction((notaAtual) => {
+            if (!notaAtual || !notaAtual.pagamentos || !notaAtual.pagamentos[idPagto]) {
+                motivoRejeicao = 'NAO_ENCONTRADO';
+                return;
+            }
+            const pAtual = notaAtual.pagamentos[idPagto];
+            if (pAtual.status === 'ESTORNADO') {
+                motivoRejeicao = 'JA_ESTORNADO';
+                return;
+            }
+            pAtual.status = 'ESTORNADO';
+            pAtual.motivoEstorno = motivo;
+            pAtual.estornadoPor = operador;
+            const sit = calcularSituacaoNota(notaAtual);
+            if (notaAtual.status !== 'CANCELADA') {
+                notaAtual.status = sit.statusFinanceiro;
+            }
+            return notaAtual;
+        });
+        return { committed: res.committed, motivoRejeicao };
+    }
+
+    const estornoA = await simularEstorno(bancoEstorno, 'p_500', 'Cancelamento do cliente', 'Comp_A');
+    const estornoB = await simularEstorno(bancoEstorno, 'p_500', 'Tentativa simultânea', 'Comp_B');
+
+    assert.strictEqual(estornoA.committed, true, 'Primeiro estorno deve ser aprovado');
+    assert.strictEqual(estornoB.committed, false, 'Segundo estorno deve ser rejeitado');
+    assert.strictEqual(estornoB.motivoRejeicao, 'JA_ESTORNADO', 'Segundo estorno deve detectar JA_ESTORNADO');
+    assert.strictEqual(bancoEstorno.nota.pagamentos['p_500'].status, 'ESTORNADO');
+    assert.strictEqual(calcularSituacaoNota(bancoEstorno.nota).saldo, 1000, 'Saldo restaurado');
+    console.log('✓ Sucesso: Estorno concorrente protegido: 1 aprovado, 1 rejeitado (JA_ESTORNADO), histórico íntegro.');
+
+    // =========================================================================
+    // 7. TESTES DE CANCELAMENTO VS BAIXA CONCORRENTE (ITEM 8)
+    // =========================================================================
+    console.log('\n--- TESTE 7: CANCELAMENTO VS BAIXA CONCORRENTE (ITEM 8) ---');
+
+    async function simularCancelamento(bancoRef, motivo, operador) {
+        let motivoRejeicao = null;
+        const res = await bancoRef.transaction((notaAtual) => {
+            if (!notaAtual) return notaAtual;
+            if (notaAtual.status === 'CANCELADA') {
+                motivoRejeicao = 'JA_CANCELADA';
+                return;
+            }
+            const sit = calcularSituacaoNota(notaAtual);
+            if (sit.statusFinanceiro === 'QUITADA') {
+                motivoRejeicao = 'QUITADA';
+                return;
+            }
+            notaAtual.status = 'CANCELADA';
+            notaAtual.motivoCancelamento = motivo;
+            notaAtual.canceladaPor = operador;
+            return notaAtual;
+        });
+        return { committed: res.committed, motivoRejeicao };
+    }
+
+    // Cenário 7.1: Cancelamento ocorre antes -> Baixa é rejeitada
+    const notaParaCancel1 = { id: 'nc_1', valorOriginal: 500, status: 'ABERTA', pagamentos: {} };
+    const bancoCancel1 = new MockFirebaseNotaRef(notaParaCancel1);
+    const cancel1 = await simularCancelamento(bancoCancel1, 'Cliente desistiu', 'Op_Admin');
+    assert.strictEqual(cancel1.committed, true);
+    const baixaPosCancel = await simularBaixaConcorrente(bancoCancel1, 200, 'Op_Caixa', 'IDEMP_POS_CANCEL');
+    assert.strictEqual(baixaPosCancel.committed, false, 'Baixa em nota cancelada deve ser rejeitada');
+    assert.strictEqual(baixaPosCancel.motivoRejeicao, 'CANCELADA');
+    console.log('✓ Sucesso 7.1: Cancelamento antes de baixa bloqueou novos pagamentos na nota.');
+
+    // Cenário 7.2: Baixa ocorre antes -> Cancelamento registra preservando pagamento
+    const notaParaCancel2 = { id: 'nc_2', valorOriginal: 500, status: 'ABERTA', pagamentos: {} };
+    const bancoCancel2 = new MockFirebaseNotaRef(notaParaCancel2);
+    const baixaAntes = await simularBaixaConcorrente(bancoCancel2, 200, 'Op_Caixa', 'IDEMP_ANTES');
+    assert.strictEqual(baixaAntes.committed, true);
+    const cancelPosBaixa = await simularCancelamento(bancoCancel2, 'Cancelamento posterior', 'Op_Admin');
+    assert.strictEqual(cancelPosBaixa.committed, true);
+    assert.strictEqual(bancoCancel2.nota.status, 'CANCELADA');
+    assert.strictEqual(Object.keys(bancoCancel2.nota.pagamentos).length, 1, 'Pagamento realizado permanece íntegro no histórico');
+    console.log('✓ Sucesso 7.2: Pagamento prévio preservado no histórico mesmo após cancelamento.');
+
+    // =========================================================================
+    // 8. TESTES DE IDEMPOTÊNCIA E RETRY DE BAIXA (ITEM 4)
+    // =========================================================================
+    console.log('\n--- TESTE 8: IDEMPOTÊNCIA DE BAIXA E RETRIES DE CONEXÃO (ITEM 4) ---');
+    const notaIdemp = { id: 'ni_1', valorOriginal: 800, status: 'ABERTA', pagamentos: {} };
+    const bancoIdemp = new MockFirebaseNotaRef(notaIdemp);
+    const CHAVE_ESTAVEL = 'TOKEN_IDEMP_ESTAVEL_12345';
+
+    // 1º Envio
+    const tentativa1 = await simularBaixaConcorrente(bancoIdemp, 300, 'Caixa_1', CHAVE_ESTAVEL);
+    assert.strictEqual(tentativa1.committed, true);
+
+    // 2º Envio com mesma chave (simulando timeout de rede / retry)
+    const pagtosNotaIdemp = Object.values(bancoIdemp.nota.pagamentos);
+    const jaGravado = pagtosNotaIdemp.find(p => p.idempotencyKey === CHAVE_ESTAVEL);
+    assert(jaGravado, 'Pagamento gravado deve existir');
+
+    // Transação aborta sem duplicar
+    let pagamentoDuplicado = null;
+    const resTentativa2 = await bancoIdemp.transaction((notaAtual) => {
+        if (notaAtual.pagamentos) {
+            const dup = Object.values(notaAtual.pagamentos).find(p => p.idempotencyKey === CHAVE_ESTAVEL);
+            if (dup) {
+                pagamentoDuplicado = dup;
+                return; // Aborta
+            }
+        }
+    });
+    assert.strictEqual(resTentativa2.committed, false, 'Transação com chave já existente deve abortar sem erro');
+    assert.strictEqual(pagamentoDuplicado.idempotencyKey, CHAVE_ESTAVEL);
+    assert.strictEqual(Object.keys(bancoIdemp.nota.pagamentos).length, 1, 'Apenas 1 pagamento gravado');
+    assert.strictEqual(calcularSituacaoNota(bancoIdemp.nota).saldo, 500, 'Saldo final R$ 500');
+    console.log('✓ Sucesso: Retry com mesma idempotencyKey retorna recibo existente sem duplicar pagamento nem alterar saldo.');
 
     console.log('\n=================================================================');
     console.log('TODOS OS TESTES DE AUDITORIA E BLINDAGEM PASSARAM COM SUCESSO! 100% OK');

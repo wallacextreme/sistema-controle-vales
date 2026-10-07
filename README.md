@@ -75,8 +75,11 @@ npm run tauri dev
 ## 🔒 Segurança, Concorrência e Blindagem de Dados
 
 - **Proteção Concorrente de Baixas**: Baixas utilizam transações atômicas nativas do Firebase (`ref.transaction()`). O saldo real do servidor é revalidado no momento da gravação, impedindo que acessos simultâneos resultem em saldo negativo ou cobranças acima do valor devido.
-- **Idempotência (Proteção contra Duplo Clique)**: Cada tentativa de baixa gera um token único de idempotência (`IDEMP-...`). Cliques múltiplos ou requisições concorrentes são interceptados e retornam o recibo existente sem duplicar registros.
-- **Unicidade de Identificadores**: Geradores criptográficos garantem que números de controle (`NP-XXXXXXXX`) e recibos (`REC-XXXXXXXX`) sejam 100% únicos tanto em memória quanto no banco.
+- **Cancelamento e Estorno Transacionais**: Operações de cancelamento de notas e estorno de pagamentos também são executadas via `ref.transaction()`, eliminando condições de corrida entre cancelamento simultâneo e novos pagamentos, além de rejeitar estornos duplicados concorrentes.
+- **Idempotência (Proteção contra Duplo Clique e Retries)**: Cada tentativa de baixa gera um token único de idempotência (`IDEMP-...`). Cliques múltiplos ou reenvios após oscilação de conexão retornam o recibo já gravado sem duplicar pagamentos ou consumir números sequenciais.
+- **Sequências Atômicas Distribuídas (`NP-000001` / `REC-000001`)**: Contadores atômicos em `/sequencias/notasPrazo` e `/sequencias/recibos` garantem unicidade absoluta e ordenação estrita entre múltiplos computadores conectados, sem reutilização de números em cancelamentos ou estornos e com seed automático que protege identificadores existentes.
+- **Regras de Segurança de Produção**: Arquivo `database.rules.json` incluído para validação e restrição estrita de permissões nas coleções `/vales`, `/notasPrazo` e `/sequencias`, garantindo imutabilidade de IDs e validação de tipos de dados.
+- **Dashboard Financeiro Auditável**: Exibição detalhada de Total a Receber (saldo ativo), Total Recebido, Total Emitido Bruto, (-) Cancelado e Total Emitido Líquido Ativo.
 - **Backup com Pré-Visualização e Merge Não-Destrutivo**:
   - Antes da importação, uma tela de pré-visualização apresenta a contagem de registros novos, existentes e pagamentos a incorporar.
   - A importação realiza **merge individualizado** por chave e subcoleção (`/pagamentos/{id}`).
@@ -84,4 +87,4 @@ npm run tauri dev
   - Backups legados v1 (`[ { ... } ]`) continuam 100% suportados e restauráveis sem conflitos.
 - **Histórico Imutável e Auditoria**: Pagamentos confirmados não podem ser alterados diretamente. Correções são tratadas exclusivamente via **Estorno**, gerando um novo evento de auditoria com operador, data e justificativa obrigatória, recalculando o saldo e preservando o recibo original.
 - **Zero Migração Destrutiva**: A coleção legada `/vales` e seus layouts de impressão em meia folha A4 permanecem 100% intactos.
-- **Suíte de Testes Automatizados**: A suíte em `tests/run_all_audits.cjs` valida 20.000 IDs sem colisões, cenários concorrentes de pagamentos simultâneos, merge não-destrutivo de backups e compatibilidade com registros legados.
+- **Suíte de Testes Automatizados**: A suíte em `tests/run_all_audits.cjs` valida sequências atômicas distribuídas, cenários concorrentes de pagamentos simultâneos (2x R$700 e 2x R$500), estornos concorrentes, cancelamento concorrente vs baixa, idempotência com retries de rede, merge não-destrutivo de backups e compatibilidade com registros legados.
