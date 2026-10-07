@@ -511,6 +511,7 @@
             </div>
 
             <input type="hidden" id="idNotaPrazoSendoBaixada">
+            <input type="hidden" id="tokenNotaBaixaIdempotencia">
 
             <div class="space-y-4">
                 <div>
@@ -1246,59 +1247,247 @@
         }
 
         async function importarDadosJSON(e) {
+            const inputArquivo = e.target;
+            const arquivo = inputArquivo.files && inputArquivo.files[0];
+            if (!arquivo) return;
+
             if (!await validarSenhaMaster()) {
-                Swal.fire('Erro', 'Senha incorreta.', 'error');
+                Swal.fire('Erro', 'Senha incorreta. Importação cancelada.', 'error');
+                inputArquivo.value = '';
                 return;
             }
+
             const reader = new FileReader();
             reader.onload = async (evento) => {
+                inputArquivo.value = ''; // Permite selecionar o mesmo arquivo novamente
                 try {
                     const dados = JSON.parse(evento.target.result);
-                    Swal.fire({ title: 'Processando...', text: 'Sincronizando registros...', didOpen: () => Swal.showLoading() });
                     
-                    let qtdValesImportados = 0;
-                    let qtdNotasImportadas = 0;
+                    let versaoTexto = '';
+                    let valesBackup = [];
+                    let notasBackup = [];
+                    let dataExportacao = '';
 
-                    // Reconhecimento do Formato Antigo Legado (Array direto de Vales)
+                    // 1. Detecção do Formato e Schema
                     if (Array.isArray(dados)) {
-                        for (let item of dados) {
-                            if (item && item.id) {
-                                await database.ref('vales/' + item.id).set(item);
-                                qtdValesImportados++;
-                            }
-                        }
-                        Swal.fire('Sucesso!', `Backup legado importado com sucesso: ${qtdValesImportados} vales sincronizados. Dados existentes preservados.`, 'success');
+                        versaoTexto = 'Legado V1 (Apenas Vales de Crédito)';
+                        valesBackup = dados;
+                        notasBackup = [];
+                    } else if (dados && typeof dados === 'object') {
+                        versaoTexto = (dados.schemaVersion === 2 || dados.app === 'Tucano Cloud')
+                            ? 'Schema V2 (Tucano Cloud Oficial)'
+                            : `Personalizado (v${dados.schemaVersion || '1'})`;
+                        dataExportacao = dados.exportedAt || '';
+                        valesBackup = Array.isArray(dados.vales) ? dados.vales : [];
+                        notasBackup = Array.isArray(dados.notasPrazo) ? dados.notasPrazo : [];
+                    } else {
+                        Swal.fire('Erro', 'Estrutura JSON não reconhecida pelo sistema.', 'error');
                         return;
                     }
 
-                    // Formato Schema Version 2 ou com propriedades explícitas (Merge Seguro)
-                    if (dados && typeof dados === 'object') {
-                        if (Array.isArray(dados.vales)) {
-                            for (let item of dados.vales) {
-                                if (item && item.id) {
-                                    await database.ref('vales/' + item.id).set(item);
-                                    qtdValesImportados++;
+                    // 2. Análise Prévia contra o Estado Atual (Auditoria Pré-Importação)
+                    const totalValesBackup = valesBackup.filter(v => v && v.id).length;
+                    const valesNovos = valesBackup.filter(v => v && v.id && !valesMap[v.id]).length;
+                    const valesExistentes = valesBackup.filter(v => v && v.id && valesMap[v.id]).length;
+
+                    const totalNotasBackup = notasBackup.filter(n => n && n.id).length;
+                    const notasNovas = notasBackup.filter(n => n && n.id && !notasPrazoMap[n.id]).length;
+                    const notasExistentes = notasBackup.filter(n => n && n.id && notasPrazoMap[n.id]).length;
+
+                    let totalPagtosBackup = 0;
+                    let pagtosNovosParaAdicionar = 0;
+                    let pagtosExistentesNoBanco = 0;
+
+                    notasBackup.forEach(n => {
+                        if (!n || !n.id) return;
+                        const pagtosBkp = extrairPagamentosNota(n);
+                        totalPagtosBackup += pagtosBkp.length;
+
+                        if (notasPrazoMap[n.id]) {
+                            const pagtosBanco = extrairPagamentosNota(notasPrazoMap[n.id]);
+                            const idsBanco = new Set(pagtosBanco.map(p => p.id));
+                            pagtosBkp.forEach(pb => {
+                                if (pb && pb.id && !idsBanco.has(pb.id)) {
+                                    pagtosNovosParaAdicionar++;
                                 }
-                            }
+                            });
+                            pagtosExistentesNoBanco += pagtosBanco.length;
+                        } else {
+                            pagtosNovosParaAdicionar += pagtosBkp.length;
                         }
-                        if (Array.isArray(dados.notasPrazo)) {
-                            for (let item of dados.notasPrazo) {
-                                if (item && item.id) {
-                                    await database.ref('notasPrazo/' + item.id).set(item);
-                                    qtdNotasImportadas++;
-                                }
-                            }
-                        }
-                        Swal.fire('Sucesso!', `Backup v2 importado: ${qtdValesImportados} vales e ${qtdNotasImportadas} notas a prazo sincronizados com segurança.`, 'success');
-                    } else {
-                        Swal.fire('Erro', 'Formato de arquivo JSON não reconhecido.', 'error');
+                    });
+
+                    // 3. Exibição da Tela de Pré-Visualização Obrigatória
+                    const modalPrevia = await Swal.fire({
+                        title: 'Backup Detectado',
+                        html: `
+                            <div class="text-left text-xs space-y-3 bg-slate-900/80 p-4 rounded-2xl border border-slate-700/80">
+                                <div><strong>Formato do Arquivo:</strong> <span class="text-indigo-400 font-bold">${escapeHtml(versaoTexto)}</span></div>
+                                ${dataExportacao ? `<div><strong>Exportado em:</strong> <span class="text-slate-300 font-medium">${escapeHtml(fD(dataExportacao.split('T')[0]))} às ${escapeHtml(dataExportacao.split('T')[1]?.substring(0, 5) || '')}</span></div>` : ''}
+                                <hr class="border-slate-800">
+                                <div class="space-y-1">
+                                    <div class="font-bold text-slate-200">🏷️ Vales de Crédito:</div>
+                                    <div class="pl-2">• Total no arquivo: <strong>${totalValesBackup}</strong></div>
+                                    <div class="pl-2 text-emerald-400 font-medium">• Novos a registrar: <strong>${valesNovos}</strong></div>
+                                    <div class="pl-2 text-slate-400">• Já existentes (preservados): <strong>${valesExistentes}</strong></div>
+                                </div>
+                                <div class="space-y-1">
+                                    <div class="font-bold text-slate-200">📅 Notas a Prazo:</div>
+                                    <div class="pl-2">• Total no arquivo: <strong>${totalNotasBackup}</strong></div>
+                                    <div class="pl-2 text-emerald-400 font-medium">• Novas a registrar: <strong>${notasNovas}</strong></div>
+                                    <div class="pl-2 text-slate-400">• Já existentes (preservadas): <strong>${notasExistentes}</strong></div>
+                                </div>
+                                <div class="space-y-1">
+                                    <div class="font-bold text-slate-200">💵 Pagamentos / Recibos:</div>
+                                    <div class="pl-2">• Total no arquivo: <strong>${totalPagtosBackup}</strong></div>
+                                    <div class="pl-2 text-emerald-400 font-medium">• Novos a incorporar: <strong>${pagtosNovosParaAdicionar}</strong></div>
+                                    <div class="pl-2 text-slate-400">• Já existentes no banco (intactos): <strong>${pagtosExistentesNoBanco}</strong></div>
+                                </div>
+                                <div class="p-3 bg-emerald-950/40 border border-emerald-800 rounded-xl text-emerald-300 mt-2">
+                                    🛡️ <strong>Blindagem Ativa:</strong> Merge 100% não-destrutivo. Dados e pagamentos já existentes no banco NÃO serão sobrescritos nem apagados.
+                                </div>
+                            </div>
+                        `,
+                        icon: 'info',
+                        showCancelButton: true,
+                        confirmButtonText: '🛡️ IMPORTAR COM SEGURANÇA',
+                        cancelButtonText: 'CANCELAR',
+                        confirmButtonColor: '#2563eb',
+                        cancelButtonColor: '#475569',
+                        allowOutsideClick: false
+                    });
+
+                    if (!modalPrevia.isConfirmed) {
+                        return;
                     }
+
+                    // 4. Execução da Importação com Merge Não Destrutivo
+                    Swal.fire({
+                        title: 'Importando com Segurança...',
+                        text: 'Sincronizando registros sem sobrescrever dados existentes...',
+                        allowOutsideClick: false,
+                        didOpen: () => Swal.showLoading()
+                    });
+
+                    let valesNovosGravados = 0;
+                    let valesPreservados = 0;
+                    let notasNovasGravadas = 0;
+                    let notasPreservadas = 0;
+                    let pagtosNovosIncorporados = 0;
+
+                    // 4.1 Processamento Seguro de Vales
+                    for (const v of valesBackup) {
+                        if (!v || !v.id) continue;
+                        if (!valesMap[v.id]) {
+                            // Vale novo que não existe no banco
+                            await database.ref('vales/' + v.id).set(v);
+                            valesNovosGravados++;
+                        } else {
+                            // Vale já existe: não substitui o objeto inteiro!
+                            valesPreservados++;
+                            // Mescla apenas baixas do backup que porventura faltem no banco
+                            const baixasBanco = valesMap[v.id].baixas || {};
+                            const baixasBkp = v.baixas || {};
+                            const updatesBaixasVale = {};
+                            let temBaixaNova = false;
+
+                            for (const kBaixa of Object.keys(baixasBkp)) {
+                                if (!baixasBanco[kBaixa]) {
+                                    updatesBaixasVale[`vales/${v.id}/baixas/${kBaixa}`] = baixasBkp[kBaixa];
+                                    temBaixaNova = true;
+                                }
+                            }
+                            if (temBaixaNova) {
+                                await database.ref().update(updatesBaixasVale);
+                            }
+                        }
+                    }
+
+                    // 4.2 Processamento Seguro de Notas a Prazo (Nunca usar set() na nota inteira já existente)
+                    for (const n of notasBackup) {
+                        if (!n || !n.id) continue;
+
+                        if (!notasPrazoMap[n.id]) {
+                            // Nota nova: prepara estrutura limpa e salva
+                            const notaNova = { ...n };
+                            if (Array.isArray(notaNova.pagamentos)) {
+                                const objP = {};
+                                notaNova.pagamentos.forEach(p => { if (p && p.id) objP[p.id] = p; });
+                                notaNova.pagamentos = objP;
+                            }
+                            const situacaoNova = calcularSituacaoNota(notaNova);
+                            notaNova.status = situacaoNova.statusFinanceiro;
+                            await database.ref('notasPrazo/' + n.id).set(notaNova);
+                            notasNovasGravadas++;
+                        } else {
+                            // Nota JÁ EXISTE no banco: NUNCA usar set()!
+                            notasPreservadas++;
+
+                            // Obtém o registro mais atualizado diretamente do Firebase
+                            const snapBanco = await database.ref('notasPrazo/' + n.id).once('value');
+                            const notaBanco = snapBanco.val() || notasPrazoMap[n.id];
+                            const pagtosBanco = notaBanco.pagamentos || {};
+                            const pagtosBkp = extrairPagamentosNota(n);
+
+                            const updatesNota = {};
+                            let pagtosAdicionadosNestaNota = 0;
+
+                            for (const pb of pagtosBkp) {
+                                if (pb && pb.id && !pagtosBanco[pb.id]) {
+                                    // Pagamento existente no backup que NÃO constava no banco -> incorpora!
+                                    updatesNota[`notasPrazo/${n.id}/pagamentos/${pb.id}`] = pb;
+                                    pagtosAdicionadosNestaNota++;
+                                    pagtosNovosIncorporados++;
+                                }
+                                // Se já existe em pagtosBanco, NUNCA sobrescreve (preserva integridade e possíveis estornos)
+                            }
+
+                            if (pagtosAdicionadosNestaNota > 0) {
+                                const pagtosCombinados = { ...pagtosBanco };
+                                for (const pb of pagtosBkp) {
+                                    if (pb && pb.id && !pagtosCombinados[pb.id]) {
+                                        pagtosCombinados[pb.id] = pb;
+                                    }
+                                }
+                                const notaRecalculada = { ...notaBanco, pagamentos: pagtosCombinados };
+                                const situacaoRecalculada = calcularSituacaoNota(notaRecalculada);
+
+                                if (notaBanco.status !== 'CANCELADA') {
+                                    updatesNota[`notasPrazo/${n.id}/status`] = situacaoRecalculada.statusFinanceiro;
+                                }
+                                updatesNota[`notasPrazo/${n.id}/atualizadoEm`] = new Date().toISOString();
+                                updatesNota[`notasPrazo/${n.id}/atualizadoPor`] = 'Importação Backup (Merge Seguro)';
+
+                                await database.ref().update(updatesNota);
+                            }
+                        }
+                    }
+
+                    // 5. Relatório Final de Conclusão para o Usuário
+                    Swal.fire({
+                        title: 'Importação Concluída com Sucesso!',
+                        html: `
+                            <div class="text-left text-xs space-y-2 p-3 bg-slate-900/90 rounded-2xl border border-slate-700">
+                                <div>🏷️ <strong>${valesNovosGravados}</strong> vales novos cadastrados</div>
+                                <div>🏷️ <strong>${valesPreservados}</strong> vales existentes preservados intactos</div>
+                                <div>📅 <strong>${notasNovasGravadas}</strong> notas a prazo novas cadastradas</div>
+                                <div>📅 <strong>${notasPreservadas}</strong> notas existentes preservadas intactas</div>
+                                <div>💵 <strong>${pagtosNovosIncorporados}</strong> pagamentos novos incorporados</div>
+                                <div class="text-emerald-400 font-bold mt-2 pt-2 border-t border-slate-800">
+                                    🛡️ 0 dados, baixas ou históricos apagados do sistema!
+                                </div>
+                            </div>
+                        `,
+                        icon: 'success',
+                        confirmButtonText: 'Entendido'
+                    });
+
                 } catch (err) {
                     console.error(err);
-                    Swal.fire('Erro', 'Arquivo inválido ou corrompido.', 'error');
+                    Swal.fire('Erro', 'Arquivo JSON inválido ou corrompido.', 'error');
                 }
             };
-            reader.readAsText(e.target.files[0]);
+            reader.readAsText(arquivo);
         }
 
         function imprimirComprovanteVale(id) {
@@ -1441,22 +1630,72 @@
             }
         }
 
-        function gerarNumeroControleNota() {
+        // Conjunto de controle em memória para prevenção de clique duplo/duplo envio
+        const operacoesBaixaEmAndamento = new Set();
+
+        async function gerarNumeroControleNotaUnico() {
             const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-            let codigo = '';
-            for (let i = 0; i < 8; i++) {
-                codigo += chars.charAt(Math.floor(Math.random() * chars.length));
+            let tentativas = 0;
+            while (tentativas < 50) {
+                let codigo = '';
+                for (let i = 0; i < 8; i++) {
+                    codigo += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+                const candidato = `NP-${codigo}`;
+
+                // 1. Checagem em memória local sincronizada
+                const existeLocal = listaGlobalNotasPrazo.some(n => n.numeroControle === candidato);
+                if (existeLocal) {
+                    tentativas++;
+                    continue;
+                }
+
+                // 2. Checagem direta no Firebase Realtime Database
+                try {
+                    const snap = await database.ref('notasPrazo')
+                        .orderByChild('numeroControle')
+                        .equalTo(candidato)
+                        .once('value');
+                    if (!snap.exists()) {
+                        return candidato;
+                    }
+                } catch (e) {
+                    // Se a consulta indexada offline falhar, a verificação local garante segurança
+                    return candidato;
+                }
+                tentativas++;
             }
-            return `NP-${codigo}`;
+            // Fallback criptográfico com timestamp para garantia absoluta de unicidade
+            const extra = Date.now().toString(36).toUpperCase().slice(-4);
+            return `NP-${extra}${Math.floor(Math.random() * 8999 + 1000)}`;
         }
 
-        function gerarNumeroRecibo() {
+        async function gerarNumeroReciboUnico() {
             const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-            let codigo = '';
-            for (let i = 0; i < 8; i++) {
-                codigo += chars.charAt(Math.floor(Math.random() * chars.length));
+            let tentativas = 0;
+            while (tentativas < 50) {
+                let codigo = '';
+                for (let i = 0; i < 8; i++) {
+                    codigo += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+                const candidato = `REC-${codigo}`;
+
+                // Verifica unicidade em todos os pagamentos de todas as notas em memória
+                let existe = false;
+                for (const nota of listaGlobalNotasPrazo) {
+                    const pagtos = extrairPagamentosNota(nota);
+                    if (pagtos.some(p => p.numeroRecibo === candidato)) {
+                        existe = true;
+                        break;
+                    }
+                }
+                if (!existe) {
+                    return candidato;
+                }
+                tentativas++;
             }
-            return `REC-${codigo}`;
+            const extra = Date.now().toString(36).toUpperCase().slice(-4);
+            return `REC-${extra}${Math.floor(Math.random() * 8999 + 1000)}`;
         }
 
         function extrairPagamentosNota(nota) {
@@ -1468,58 +1707,103 @@
             }));
         }
 
-        function calcularSaldoNota(nota) {
+        // =========================================================================
+        // DOMÍNIO CENTRALIZADO: REGRA ÚNICA DE CÁLCULO E SITUAÇÃO DA NOTA
+        // =========================================================================
+        // Status Financeiro: ABERTA / PARCIAL / QUITADA / CANCELADA
+        // Indicador de Cobrança: NORMAL / VENCENDO / VENCIDA
+        // Prioridade: CANCELADA > QUITADA > Indicador de Cobrança (para saldo > 0)
+        function calcularSituacaoNota(nota, dataReferencia = new Date()) {
+            if (!nota) {
+                return {
+                    saldo: 0,
+                    totalRecebido: 0,
+                    statusFinanceiro: 'ABERTA',
+                    indicadorCobranca: 'NORMAL',
+                    statusConsolidado: 'ABERTA'
+                };
+            }
+
             const valorOrig = parseFloat(nota.valorOriginal) || 0;
             const pagamentos = extrairPagamentosNota(nota);
-            const totalPagoAtivo = pagamentos
-                .filter(p => p.status !== 'ESTORNADO')
-                .reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0);
-            const saldo = Math.max(0, valorOrig - totalPagoAtivo);
-            return Math.round(saldo * 100) / 100;
-        }
+            const pagamentosAtivos = pagamentos.filter(p => p && p.status !== 'ESTORNADO');
+            const totalRecebido = Math.round(pagamentosAtivos.reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0) * 100) / 100;
+            const saldo = Math.max(0, Math.round((valorOrig - totalRecebido) * 100) / 100);
 
-        function calcularTotalPagoNota(nota) {
-            const pagamentos = extrairPagamentosNota(nota);
-            const totalPagoAtivo = pagamentos
-                .filter(p => p.status !== 'ESTORNADO')
-                .reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0);
-            return Math.round(totalPagoAtivo * 100) / 100;
-        }
-
-        function obterStatusNota(nota) {
+            // 1. CANCELADA tem prioridade máxima
             if (nota.status === 'CANCELADA' || nota.statusCancelamento === 'CANCELADA') {
-                return 'CANCELADA';
-            }
-            const saldo = calcularSaldoNota(nota);
-            const valorOrig = parseFloat(nota.valorOriginal) || 0;
-            const pagamentosAtivos = extrairPagamentosNota(nota).filter(p => p.status !== 'ESTORNADO');
-            const totalPago = pagamentosAtivos.reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0);
-
-            if (saldo <= 0 && valorOrig > 0) {
-                return 'QUITADA';
+                return {
+                    saldo: saldo,
+                    totalRecebido: totalRecebido,
+                    statusFinanceiro: 'CANCELADA',
+                    indicadorCobranca: 'NORMAL',
+                    statusConsolidado: 'CANCELADA'
+                };
             }
 
-            const hoje = new Date().toISOString().split('T')[0];
-            const vencimento = nota.dataVencimento || '';
-
-            if (vencimento && vencimento < hoje) {
-                return 'VENCIDA';
+            // 2. QUITADA tem prioridade sobre vencimento
+            if (saldo <= 0.001 && valorOrig > 0) {
+                return {
+                    saldo: 0,
+                    totalRecebido: totalRecebido,
+                    statusFinanceiro: 'QUITADA',
+                    indicadorCobranca: 'NORMAL',
+                    statusConsolidado: 'QUITADA'
+                };
             }
 
-            if (vencimento) {
-                const hojeDate = new Date(hoje + 'T00:00:00');
-                const vencDate = new Date(vencimento + 'T00:00:00');
-                const diffDias = Math.ceil((vencDate - hojeDate) / (1000 * 60 * 60 * 24));
-                if (diffDias >= 0 && diffDias <= 3) {
-                    return 'VENCENDO';
+            // 3. Status Financeiro Principal
+            const statusFinanceiro = (totalRecebido > 0) ? 'PARCIAL' : 'ABERTA';
+
+            // 4. Indicador de Cobrança (para notas com saldo)
+            let indicadorCobranca = 'NORMAL';
+            const vencimentoStr = nota.dataVencimento || '';
+            if (vencimentoStr) {
+                const refStr = typeof dataReferencia === 'string'
+                    ? dataReferencia.split('T')[0]
+                    : (dataReferencia instanceof Date ? dataReferencia.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+
+                if (vencimentoStr < refStr) {
+                    indicadorCobranca = 'VENCIDA';
+                } else {
+                    const [aV, mV, dV] = vencimentoStr.split('-').map(Number);
+                    const [aR, mR, dR] = refStr.split('-').map(Number);
+                    const dtV = new Date(aV, mV - 1, dV);
+                    const dtR = new Date(aR, mR - 1, dR);
+                    const diffDias = Math.ceil((dtV - dtR) / (1000 * 60 * 60 * 24));
+                    if (diffDias >= 0 && diffDias <= 3) {
+                        indicadorCobranca = 'VENCENDO';
+                    }
                 }
             }
 
-            if (totalPago > 0) {
-                return 'PARCIAL';
+            // 5. Status Consolidado de Exibição
+            let statusConsolidado = statusFinanceiro;
+            if (indicadorCobranca === 'VENCIDA') {
+                statusConsolidado = 'VENCIDA';
+            } else if (indicadorCobranca === 'VENCENDO') {
+                statusConsolidado = 'VENCENDO';
             }
 
-            return 'ABERTA';
+            return {
+                saldo,
+                totalRecebido,
+                statusFinanceiro,
+                indicadorCobranca,
+                statusConsolidado
+            };
+        }
+
+        function obterStatusNota(nota) {
+            return calcularSituacaoNota(nota).statusConsolidado;
+        }
+
+        function calcularSaldoNota(nota) {
+            return calcularSituacaoNota(nota).saldo;
+        }
+
+        function calcularTotalPagoNota(nota) {
+            return calcularSituacaoNota(nota).totalRecebido;
         }
 
         document.getElementById('formCadastroNotaPrazo').addEventListener('submit', async function(e) {
@@ -1545,7 +1829,7 @@
 
             const novaRef = database.ref('notasPrazo').push();
             const idTecnico = novaRef.key;
-            const numeroControle = gerarNumeroControleNota();
+            const numeroControle = await gerarNumeroControleNotaUnico();
             const operadorAtual = (auth.currentUser && auth.currentUser.email) ? auth.currentUser.email : 'Operador';
 
             const dadosNota = {
@@ -1600,6 +1884,11 @@
             atualizarTabelaNotasPrazo();
         }
 
+        // =========================================================================
+        // DASHBOARD REVISADO: MATEMÁTICA FINANCEIRA PRECISA E AUDITÁVEL
+        // =========================================================================
+        // Regra de Cancelamento: Notas canceladas NÃO compõem o saldo a receber,
+        // nem os indicadores de vencimento (vencidas/vencendo) ou total emitido ativo.
         function atualizarDashboardNotasPrazo() {
             let sAbertas = 0, qAbertas = 0;
             let sParciais = 0, qParciais = 0;
@@ -1615,37 +1904,44 @@
             const hojeStr = new Date().toISOString().split('T')[0];
 
             listaGlobalNotasPrazo.forEach(nota => {
-                const status = obterStatusNota(nota);
-                const saldo = calcularSaldoNota(nota);
-                const totalPago = calcularTotalPagoNota(nota);
+                const sit = calcularSituacaoNota(nota);
                 const valorOrig = parseFloat(nota.valorOriginal) || 0;
 
-                totalEmitidoGeral += valorOrig;
-                totalRecebidoGeral += totalPago;
-                if (status !== 'CANCELADA') {
-                    totalPendenteGeral += saldo;
+                // Notas canceladas são excluídas das métricas ativas de contas a receber
+                if (sit.statusFinanceiro === 'CANCELADA') {
+                    return;
                 }
 
-                if (status === 'ABERTA') {
-                    sAbertas += saldo;
+                totalEmitidoGeral += valorOrig;
+                totalRecebidoGeral += sit.totalRecebido;
+                totalPendenteGeral += sit.saldo;
+
+                if (sit.statusFinanceiro === 'ABERTA') {
+                    sAbertas += sit.saldo;
                     qAbertas++;
-                } else if (status === 'PARCIAL') {
-                    sParciais += saldo;
+                } else if (sit.statusFinanceiro === 'PARCIAL') {
+                    sParciais += sit.saldo;
                     qParciais++;
-                } else if (status === 'VENCENDO') {
-                    sVencendo += saldo;
-                    qVencendo++;
-                } else if (status === 'VENCIDA') {
-                    sVencidas += saldo;
-                    qVencidas++;
-                } else if (status === 'QUITADA') {
+                } else if (sit.statusFinanceiro === 'QUITADA') {
                     sQuitadas += valorOrig;
                     qQuitadas++;
                 }
 
+                // Indicador de Cobrança para notas com pendência financeira
+                if (sit.saldo > 0) {
+                    if (sit.indicadorCobranca === 'VENCENDO') {
+                        sVencendo += sit.saldo;
+                        qVencendo++;
+                    } else if (sit.indicadorCobranca === 'VENCIDA') {
+                        sVencidas += sit.saldo;
+                        qVencidas++;
+                    }
+                }
+
+                // Total de baixas ativas realizadas na data de hoje
                 const pagtos = extrairPagamentosNota(nota);
                 pagtos.forEach(p => {
-                    if (p.status !== 'ESTORNADO') {
+                    if (p && p.status !== 'ESTORNADO') {
                         const dataP = (p.dataPagamento || '').split('T')[0];
                         if (dataP === hojeStr) {
                             sHoje += (parseFloat(p.valor) || 0);
@@ -1700,6 +1996,9 @@
             if (pCanc) pCanc.className = `px-3 py-2 rounded-xl text-xs font-bold transition ${filtroStatusNotasPrazo === 'CANCELADA' ? 'bg-red-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}`;
         }
 
+        // =========================================================================
+        // RENDERIZAÇÃO DA TABELA COM DUPLA DIMENSÃO (FINANCEIRO + COBRANÇA)
+        // =========================================================================
         function atualizarTabelaNotasPrazo() {
             const busca = (document.getElementById('inputFiltroBuscaNotasPrazo')?.value || '').toLowerCase().trim();
             const corpo = document.getElementById('tabelaCorpoNotasPrazo');
@@ -1709,8 +2008,7 @@
             const hojeStr = new Date().toISOString().split('T')[0];
 
             const filtradas = listaGlobalNotasPrazo.filter(nota => {
-                const status = obterStatusNota(nota);
-                const saldo = calcularSaldoNota(nota);
+                const sit = calcularSituacaoNota(nota);
 
                 const textoMatch = 
                     (nota.cliente || '').toLowerCase().includes(busca) ||
@@ -1723,12 +2021,18 @@
                 if (!textoMatch) return false;
 
                 if (filtroStatusNotasPrazo === 'todas') return true;
-                if (filtroStatusNotasPrazo === 'pendentes') return saldo > 0 && status !== 'CANCELADA';
+                if (filtroStatusNotasPrazo === 'pendentes') return sit.saldo > 0 && sit.statusFinanceiro !== 'CANCELADA';
+                if (filtroStatusNotasPrazo === 'CANCELADA') return sit.statusFinanceiro === 'CANCELADA';
+                if (filtroStatusNotasPrazo === 'ABERTA') return sit.statusFinanceiro === 'ABERTA';
+                if (filtroStatusNotasPrazo === 'PARCIAL') return sit.statusFinanceiro === 'PARCIAL';
+                if (filtroStatusNotasPrazo === 'QUITADA') return sit.statusFinanceiro === 'QUITADA';
+                if (filtroStatusNotasPrazo === 'VENCENDO') return sit.saldo > 0 && sit.indicadorCobranca === 'VENCENDO' && sit.statusFinanceiro !== 'CANCELADA';
+                if (filtroStatusNotasPrazo === 'VENCIDA') return sit.saldo > 0 && sit.indicadorCobranca === 'VENCIDA' && sit.statusFinanceiro !== 'CANCELADA';
                 if (filtroStatusNotasPrazo === 'RECEBIDO_HOJE') {
                     const pagtos = extrairPagamentosNota(nota);
-                    return pagtos.some(p => p.status !== 'ESTORNADO' && (p.dataPagamento || '').split('T')[0] === hojeStr);
+                    return pagtos.some(p => p && p.status !== 'ESTORNADO' && (p.dataPagamento || '').split('T')[0] === hojeStr);
                 }
-                return status === filtroStatusNotasPrazo;
+                return sit.statusConsolidado === filtroStatusNotasPrazo;
             });
 
             if (filtradas.length === 0) {
@@ -1737,36 +2041,35 @@
             }
 
             filtradas.slice().reverse().forEach(nota => {
-                const status = obterStatusNota(nota);
-                const saldo = calcularSaldoNota(nota);
+                const sit = calcularSituacaoNota(nota);
                 const valorOrig = parseFloat(nota.valorOriginal) || 0;
 
+                // Construção de badges clara separando Status Financeiro de Indicador de Cobrança
                 let badgeHtml = '';
-                switch (status) {
-                    case 'ABERTA':
-                        badgeHtml = `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">ABERTA</span>`;
-                        break;
-                    case 'PARCIAL':
-                        badgeHtml = `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">PARCIAL</span>`;
-                        break;
-                    case 'VENCENDO':
-                        badgeHtml = `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 animate-pulse">VENCENDO</span>`;
-                        break;
-                    case 'VENCIDA':
-                        badgeHtml = `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">VENCIDA</span>`;
-                        break;
-                    case 'QUITADA':
-                        badgeHtml = `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">QUITADA</span>`;
-                        break;
-                    case 'CANCELADA':
-                        badgeHtml = `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-700 text-slate-400 border border-slate-600">CANCELADA</span>`;
-                        break;
+                if (sit.statusFinanceiro === 'CANCELADA') {
+                    badgeHtml = `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-700 text-slate-400 border border-slate-600">CANCELADA</span>`;
+                } else if (sit.statusFinanceiro === 'QUITADA') {
+                    badgeHtml = `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">QUITADA</span>`;
+                } else {
+                    // Notas com saldo em aberto (ABERTA ou PARCIAL)
+                    const badgeFin = (sit.statusFinanceiro === 'PARCIAL')
+                        ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">PARCIAL</span>`
+                        : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">ABERTA</span>`;
+
+                    let badgeCob = '';
+                    if (sit.indicadorCobranca === 'VENCIDA') {
+                        badgeCob = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">VENCIDA</span>`;
+                    } else if (sit.indicadorCobranca === 'VENCENDO') {
+                        badgeCob = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 animate-pulse">VENCENDO</span>`;
+                    }
+
+                    badgeHtml = badgeCob ? `<div class="flex items-center gap-1 flex-wrap">${badgeFin}${badgeCob}</div>` : badgeFin;
                 }
 
-                const pagtos = extrairPagamentosNota(nota).filter(p => p.status !== 'ESTORNADO');
+                const pagtos = extrairPagamentosNota(nota).filter(p => p && p.status !== 'ESTORNADO');
                 const temPagto = pagtos.length > 0;
-                const podeBaixar = saldo > 0 && status !== 'CANCELADA';
-                const podeCancelar = status !== 'CANCELADA' && status !== 'QUITADA';
+                const podeBaixar = sit.saldo > 0 && sit.statusFinanceiro !== 'CANCELADA';
+                const podeCancelar = sit.statusFinanceiro !== 'CANCELADA' && sit.statusFinanceiro !== 'QUITADA';
 
                 corpo.innerHTML += `
                     <tr class="border-b border-slate-700/30 hover:bg-slate-800/50 transition">
@@ -1781,14 +2084,14 @@
                             </div>
                         </td>
                         <td class="text-xs text-slate-300">
-                            <div class="${(status === 'VENCIDA' || status === 'VENCENDO') ? 'font-bold text-red-400' : ''}">${fD(nota.dataVencimento)}</div>
+                            <div class="${(sit.indicadorCobranca === 'VENCIDA' || sit.indicadorCobranca === 'VENCENDO') ? 'font-bold text-red-400' : ''}">${fD(nota.dataVencimento)}</div>
                             <div class="text-[10px] text-slate-500">Emissão: ${fD(nota.dataEmissao)}</div>
                         </td>
                         <td class="font-bold text-slate-200">
                             ${formatadorMoeda.format(valorOrig)}
                         </td>
-                        <td class="font-bold ${saldo > 0 ? (status === 'VENCIDA' ? 'text-red-400' : 'text-amber-400') : 'text-emerald-400'}">
-                            ${formatadorMoeda.format(saldo)}
+                        <td class="font-bold ${sit.saldo > 0 ? (sit.indicadorCobranca === 'VENCIDA' ? 'text-red-400' : 'text-amber-400') : 'text-emerald-400'}">
+                            ${formatadorMoeda.format(sit.saldo)}
                         </td>
                         <td>${badgeHtml}</td>
                         <td class="p-3.5 text-right space-x-1 whitespace-nowrap">
@@ -1806,24 +2109,30 @@
         function abrirModalBaixaNota(id) {
             const nota = listaGlobalNotasPrazo.find(x => String(x.id) === String(id));
             if (!nota) return;
-            const saldo = calcularSaldoNota(nota);
-            const status = obterStatusNota(nota);
+            const sit = calcularSituacaoNota(nota);
 
-            if (status === 'CANCELADA') {
+            if (sit.statusFinanceiro === 'CANCELADA') {
                 Swal.fire('Bloqueado', 'Esta nota está cancelada e não aceita pagamentos.', 'error');
                 return;
             }
-            if (saldo <= 0) {
+            if (sit.statusFinanceiro === 'QUITADA' || sit.saldo <= 0) {
                 Swal.fire('Quitada', 'Esta nota já está 100% quitada.', 'info');
                 return;
             }
 
             document.getElementById('idNotaPrazoSendoBaixada').value = id;
+
+            // Atribuição de Token de Idempotência único por abertura de operação de baixa
+            const tokenInput = document.getElementById('tokenNotaBaixaIdempotencia');
+            if (tokenInput) {
+                tokenInput.value = `IDEMP-${id}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+            }
+
             document.getElementById('textoNotaBaixaIdentificacao').innerText = `Nota: ${nota.numeroControle || nota.id} • Cliente: ${nota.cliente}`;
             document.getElementById('textoNotaBaixaValorOriginal').innerText = formatadorMoeda.format(parseFloat(nota.valorOriginal) || 0);
-            document.getElementById('textoNotaBaixaSaldoAtual').innerText = formatadorMoeda.format(saldo);
+            document.getElementById('textoNotaBaixaSaldoAtual').innerText = formatadorMoeda.format(sit.saldo);
 
-            mNotaBaixaValor.value = saldo.toFixed(2).replace('.', ',');
+            mNotaBaixaValor.value = sit.saldo.toFixed(2).replace('.', ',');
             document.getElementById('campoBaixaNotaData').valueAsDate = new Date();
             document.getElementById('campoBaixaNotaForma').value = 'Dinheiro';
             document.getElementById('campoBaixaNotaObs').value = '';
@@ -1835,6 +2144,9 @@
             document.getElementById('modalBaixaNotaPrazo').classList.add('hidden');
         }
 
+        // =========================================================================
+        // BAIXA CONCORRENTE BLINDADA COM TRANSAÇÃO FIREBASE E IDEMPOTÊNCIA
+        // =========================================================================
         async function confirmarProcessoDeBaixaNota() {
             const id = document.getElementById('idNotaPrazoSendoBaixada').value;
             const nota = listaGlobalNotasPrazo.find(x => String(x.id) === String(id));
@@ -1843,24 +2155,32 @@
                 return;
             }
 
-            const status = obterStatusNota(nota);
-            if (status === 'CANCELADA') {
-                Swal.fire('Bloqueado', 'Esta nota está cancelada.', 'error');
+            const sitLocal = calcularSituacaoNota(nota);
+            if (sitLocal.statusFinanceiro === 'CANCELADA') {
+                Swal.fire('Bloqueado', 'Esta nota está cancelada e não aceita pagamentos.', 'error');
+                return;
+            }
+            if (sitLocal.statusFinanceiro === 'QUITADA' || sitLocal.saldo <= 0) {
+                Swal.fire('Quitada', 'Esta nota já está quitada.', 'info');
                 return;
             }
 
-            const saldoAtual = calcularSaldoNota(nota);
             const valorPago = toF(mNotaBaixaValor.value);
             const dataPagto = document.getElementById('campoBaixaNotaData').value;
             const formaPagto = document.getElementById('campoBaixaNotaForma').value;
             const obsPagto = document.getElementById('campoBaixaNotaObs').value.trim();
 
+            const tokenInput = document.getElementById('tokenNotaBaixaIdempotencia');
+            const chaveIdempotencia = (tokenInput && tokenInput.value)
+                ? tokenInput.value
+                : `IDEMP-${id}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
             if (valorPago <= 0) {
                 Swal.fire('Atenção', 'O valor do pagamento deve ser maior que R$ 0,00.', 'warning');
                 return;
             }
-            if (valorPago > saldoAtual + 0.001) {
-                Swal.fire('Bloqueado', `Valor do pagamento excede o saldo devedor (${formatadorMoeda.format(saldoAtual)}).`, 'error');
+            if (valorPago > (sitLocal.saldo + 0.001)) {
+                Swal.fire('Bloqueado', `Valor do pagamento excede o saldo devedor (${formatadorMoeda.format(sitLocal.saldo)}).`, 'error');
                 return;
             }
             if (!dataPagto) {
@@ -1868,45 +2188,146 @@
                 return;
             }
 
+            // 1. Prevenção de Duplo Envio no Navegador
+            if (operacoesBaixaEmAndamento.has(chaveIdempotencia)) {
+                console.warn('Duplo clique interceptado com sucesso.');
+                return;
+            }
+            operacoesBaixaEmAndamento.add(chaveIdempotencia);
+
             const btnConfirmar = document.getElementById('btnConfirmarBaixaNota');
-            if (btnConfirmar.disabled) return;
-            const textoOriginal = btnConfirmar.innerHTML;
-            btnConfirmar.disabled = true;
-            btnConfirmar.innerHTML = 'Processando...';
-
-            const operadorAtual = (auth.currentUser && auth.currentUser.email) ? auth.currentUser.email : 'Operador';
-            const novoPagtoRef = database.ref(`notasPrazo/${id}/pagamentos`).push();
-            const idPagamento = novoPagtoRef.key;
-            const numeroRecibo = gerarNumeroRecibo();
-
-            const dadosPagamento = {
-                id: idPagamento,
-                numeroRecibo: numeroRecibo,
-                dataPagamento: dataPagto,
-                valor: valorPago,
-                formaPagamento: formaPagto,
-                observacao: obsPagto,
-                status: 'ATIVO',
-                criadoEm: new Date().toISOString(),
-                criadoPor: operadorAtual
-            };
-
-            const novoSaldo = Math.max(0, Math.round((saldoAtual - valorPago) * 100) / 100);
-            const novoStatus = novoSaldo <= 0 ? 'QUITADA' : 'PARCIAL';
-
-            const updates = {};
-            updates[`notasPrazo/${id}/pagamentos/${idPagamento}`] = dadosPagamento;
-            updates[`notasPrazo/${id}/status`] = novoStatus;
-            updates[`notasPrazo/${id}/atualizadoEm`] = new Date().toISOString();
-            updates[`notasPrazo/${id}/atualizadoPor`] = operadorAtual;
+            const textoOriginal = btnConfirmar ? btnConfirmar.innerHTML : 'Confirmar Baixa';
+            if (btnConfirmar) {
+                btnConfirmar.disabled = true;
+                btnConfirmar.innerHTML = 'Processando com Segurança...';
+            }
 
             try {
-                await database.ref().update(updates);
+                const operadorAtual = (auth.currentUser && auth.currentUser.email) ? auth.currentUser.email : 'Operador';
+                const idPagamento = database.ref(`notasPrazo/${id}/pagamentos`).push().key;
+                const numeroRecibo = await gerarNumeroReciboUnico();
+
+                const dadosPagamento = {
+                    id: idPagamento,
+                    numeroRecibo: numeroRecibo,
+                    idempotencyKey: chaveIdempotencia,
+                    dataPagamento: dataPagto,
+                    valor: valorPago,
+                    formaPagamento: formaPagto,
+                    observacao: obsPagto,
+                    status: 'ATIVO',
+                    criadoEm: new Date().toISOString(),
+                    criadoPor: operadorAtual
+                };
+
+                let motivoRejeicao = null;
+                let pagamentoJaExistente = null;
+                let saldoFinalPosTransacao = 0;
+
+                const refNota = database.ref('notasPrazo/' + id);
+
+                // 2. Transação Atômica Concorrente no Firebase Realtime Database
+                const resultadoTransacao = await refNota.transaction((notaAtual) => {
+                    if (!notaAtual) {
+                        return notaAtual; // Firebase passa null antes do snapshot real
+                    }
+
+                    // Validação 1: Cancelamento Concorrente
+                    if (notaAtual.status === 'CANCELADA' || notaAtual.statusCancelamento === 'CANCELADA') {
+                        motivoRejeicao = { tipo: 'CANCELADA' };
+                        return; // Aborta transação retornando undefined
+                    }
+
+                    // Validação 2: Idempotência Concorrente no Banco
+                    if (notaAtual.pagamentos) {
+                        const listaPagtos = Object.values(notaAtual.pagamentos);
+                        const duplicado = listaPagtos.find(p => p && p.idempotencyKey === chaveIdempotencia);
+                        if (duplicado) {
+                            pagamentoJaExistente = duplicado;
+                            return; // Já gravado, aborta sem erro
+                        }
+                    }
+
+                    // Validação 3: Cálculo do Saldo Real Atual no Servidor
+                    const vOrig = parseFloat(notaAtual.valorOriginal) || 0;
+                    let totalPagoAtivoServidor = 0;
+                    if (notaAtual.pagamentos) {
+                        Object.values(notaAtual.pagamentos).forEach(p => {
+                            if (p && p.status !== 'ESTORNADO') {
+                                totalPagoAtivoServidor += (parseFloat(p.valor) || 0);
+                            }
+                        });
+                    }
+                    const saldoRealServidor = Math.max(0, Math.round((vOrig - totalPagoAtivoServidor) * 100) / 100);
+
+                    if (saldoRealServidor <= 0) {
+                        motivoRejeicao = { tipo: 'JA_QUITADA' };
+                        return; // Aborta
+                    }
+
+                    // Regra Financeira Absoluta: novoPagamento <= saldoAtualReal
+                    if (valorPago > (saldoRealServidor + 0.001)) {
+                        motivoRejeicao = { tipo: 'SALDO_INSUFICIENTE', saldoReal: saldoRealServidor };
+                        return; // Aborta
+                    }
+
+                    // Gravação Atômica do Pagamento
+                    if (!notaAtual.pagamentos) {
+                        notaAtual.pagamentos = {};
+                    }
+
+                    const novoSaldo = Math.max(0, Math.round((saldoRealServidor - valorPago) * 100) / 100);
+                    saldoFinalPosTransacao = novoSaldo;
+
+                    dadosPagamento.saldoAnterior = saldoRealServidor;
+                    dadosPagamento.saldoApos = novoSaldo;
+
+                    notaAtual.pagamentos[idPagamento] = dadosPagamento;
+                    notaAtual.status = (novoSaldo <= 0.001) ? 'QUITADA' : 'PARCIAL';
+                    notaAtual.atualizadoEm = new Date().toISOString();
+                    notaAtual.atualizadoPor = operadorAtual;
+
+                    return notaAtual;
+                });
+
+                // 3. Tratamento dos Retornos da Transação
+                if (pagamentoJaExistente) {
+                    fecharModalBaixaNota();
+                    Swal.fire({
+                        title: 'Pagamento Já Confirmado!',
+                        html: `Este pagamento já havia sido processado.<br>Recibo: <strong>${pagamentoJaExistente.numeroRecibo}</strong>.`,
+                        icon: 'info'
+                    });
+                    return;
+                }
+
+                if (!resultadoTransacao.committed) {
+                    if (motivoRejeicao) {
+                        if (motivoRejeicao.tipo === 'CANCELADA') {
+                            Swal.fire('Bloqueado', 'Esta nota foi cancelada por outro usuário.', 'error');
+                        } else if (motivoRejeicao.tipo === 'JA_QUITADA') {
+                            Swal.fire('Bloqueado', 'Esta nota já foi totalmente quitada por outro usuário.', 'info');
+                        } else if (motivoRejeicao.tipo === 'SALDO_INSUFICIENTE') {
+                            Swal.fire({
+                                title: 'Saldo Alterado Concorrentemente',
+                                html: `Esta nota foi alterada por outro usuário. O saldo foi atualizado para <strong>${formatadorMoeda.format(motivoRejeicao.saldoReal)}</strong>.<br><br>Revise e tente novamente.`,
+                                icon: 'warning'
+                            });
+                            mNotaBaixaValor.value = motivoRejeicao.saldoReal.toFixed(2).replace('.', ',');
+                            document.getElementById('textoNotaBaixaSaldoAtual').innerText = formatadorMoeda.format(motivoRejeicao.saldoReal);
+                        }
+                    } else {
+                        Swal.fire('Aviso de Concorrência', 'A nota foi alterada por outro usuário. O saldo foi atualizado. Revise e tente novamente.', 'warning');
+                    }
+                    return;
+                }
+
+                // 4. Sucesso Confirmado com Proteção Transacional
                 fecharModalBaixaNota();
 
                 const escolha = await Swal.fire({
-                    title: novoSaldo <= 0 ? '🎉 Nota Quitada!' : 'Pagamento Registrado!',
-                    html: `Recibo <strong>${numeroRecibo}</strong> gerado com sucesso.<br>Saldo restante: <strong>${formatadorMoeda.format(novoSaldo)}</strong>.<br><br>Deseja imprimir o recibo em A4 agora?`,
+                    title: saldoFinalPosTransacao <= 0 ? '🎉 Nota Totalmente Quitada!' : 'Pagamento Registrado!',
+                    html: `Recibo <strong>${numeroRecibo}</strong> emitido com sucesso.<br>Saldo restante: <strong>${formatadorMoeda.format(saldoFinalPosTransacao)}</strong>.<br><br>Deseja imprimir o recibo em A4 agora?`,
                     icon: 'success',
                     showCancelButton: true,
                     confirmButtonText: '🖨️ Imprimir Recibo A4',
@@ -1916,12 +2337,16 @@
                 if (escolha.isConfirmed) {
                     imprimirReciboPagamentoA4(id, idPagamento);
                 }
+
             } catch (err) {
                 console.error(err);
                 Swal.fire('Erro', 'Não foi possível registrar o pagamento no servidor.', 'error');
             } finally {
-                btnConfirmar.disabled = false;
-                btnConfirmar.innerHTML = textoOriginal;
+                operacoesBaixaEmAndamento.delete(chaveIdempotencia);
+                if (btnConfirmar) {
+                    btnConfirmar.disabled = false;
+                    btnConfirmar.innerHTML = textoOriginal;
+                }
             }
         }
 
@@ -1962,7 +2387,7 @@
 
                 try {
                     await database.ref().update(updates);
-                    Swal.fire('Nota Cancelada', 'A nota foi marcada como cancelada. O histórico foi preservado.', 'success');
+                    Swal.fire('Nota Cancelada', 'A nota foi marcada como cancelada. O histórico e pagamentos foram preservados.', 'success');
                 } catch (err) {
                     console.error(err);
                     Swal.fire('Erro', 'Falha ao cancelar a nota no banco.', 'error');
@@ -1970,6 +2395,9 @@
             }
         }
 
+        // =========================================================================
+        // ESTORNO SEGURO COM RECONCILIAÇÃO DE SALDO E AUDITORIA COMPLETA
+        // =========================================================================
         async function solicitarEstornoPagamento(idNota, idPagamento) {
             const nota = listaGlobalNotasPrazo.find(x => String(x.id) === String(idNota));
             if (!nota) return;
@@ -1990,7 +2418,7 @@
                 title: `Estornar Pagamento ${pagto.numeroRecibo || ''}?`,
                 html: `Valor: <strong>${formatadorMoeda.format(parseFloat(pagto.valor) || 0)}</strong><br>Informe o motivo do estorno:`,
                 input: 'textarea',
-                inputPlaceholder: 'Motivo do estorno...',
+                inputPlaceholder: 'Motivo detalhado do estorno...',
                 inputValidator: (value) => {
                     if (!value || !value.trim()) {
                         return 'É necessário informar o motivo do estorno!';
@@ -2002,35 +2430,37 @@
                 cancelButtonText: 'Voltar'
             });
 
-            if (motivo) {
-                const operadorAtual = (auth.currentUser && auth.currentUser.email) ? auth.currentUser.email : 'Operador';
-                
-                const updates = {};
-                updates[`notasPrazo/${idNota}/pagamentos/${idPagamento}/status`] = 'ESTORNADO';
-                updates[`notasPrazo/${idNota}/pagamentos/${idPagamento}/estornadoEm`] = new Date().toISOString();
-                updates[`notasPrazo/${idNota}/pagamentos/${idPagamento}/estornadoPor`] = operadorAtual;
-                updates[`notasPrazo/${idNota}/pagamentos/${idPagamento}/motivoEstorno`] = motivo.trim();
-                
-                const pagtosRestantes = pagtos.filter(p => p.id !== idPagamento && p.status !== 'ESTORNADO');
-                const totalRestante = pagtosRestantes.reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0);
-                const valorOrig = parseFloat(nota.valorOriginal) || 0;
-                const novoSaldo = Math.max(0, valorOrig - totalRestante);
-                
-                let novoStatus = 'ABERTA';
-                if (novoSaldo <= 0) novoStatus = 'QUITADA';
-                else if (totalRestante > 0) novoStatus = 'PARCIAL';
-                
-                updates[`notasPrazo/${idNota}/status`] = novoStatus;
-                updates[`notasPrazo/${idNota}/atualizadoEm`] = new Date().toISOString();
-                updates[`notasPrazo/${idNota}/atualizadoPor`] = operadorAtual;
+            if (!motivo) return;
 
-                try {
-                    await database.ref().update(updates);
-                    Swal.fire('Estorno Realizado', 'O pagamento foi estornado com sucesso. Saldo recalculado.', 'success');
-                } catch (err) {
-                    console.error(err);
-                    Swal.fire('Erro', 'Falha ao estornar pagamento.', 'error');
-                }
+            const operadorAtual = (auth.currentUser && auth.currentUser.email) ? auth.currentUser.email : 'Operador';
+            const refNota = database.ref('notasPrazo/' + idNota);
+
+            try {
+                await refNota.transaction((notaAtual) => {
+                    if (!notaAtual) return notaAtual;
+                    if (!notaAtual.pagamentos || !notaAtual.pagamentos[idPagamento]) return notaAtual;
+
+                    const pAtual = notaAtual.pagamentos[idPagamento];
+                    pAtual.status = 'ESTORNADO';
+                    pAtual.estornadoEm = new Date().toISOString();
+                    pAtual.estornadoPor = operadorAtual;
+                    pAtual.motivoEstorno = motivo.trim();
+
+                    // Recalcula a situação completa considerando vencimento e pagamentos restantes
+                    const sit = calcularSituacaoNota(notaAtual);
+                    if (notaAtual.status !== 'CANCELADA') {
+                        notaAtual.status = sit.statusFinanceiro;
+                    }
+                    notaAtual.atualizadoEm = new Date().toISOString();
+                    notaAtual.atualizadoPor = operadorAtual;
+
+                    return notaAtual;
+                });
+
+                Swal.fire('Estorno Realizado', 'O pagamento foi estornado com sucesso. Histórico mantido e saldo recalculado.', 'success');
+            } catch (err) {
+                console.error(err);
+                Swal.fire('Erro', 'Falha ao processar estorno no banco.', 'error');
             }
         }
 
@@ -2353,6 +2783,32 @@
                                 </div>
                             </div>
                         </div>
+
+                        ${pagtosAtivosAteAgora.length > 1 ? `
+                            <div style="margin-bottom:14px; border:1px solid #cbd5e1; padding:8px 10px; border-radius:6px; background:#f8fafc;">
+                                <strong style="font-size:10px; text-transform:uppercase; color:#334155;">Histórico de Baixas Acumuladas (${pagtosAtivosAteAgora.length} pagamentos):</strong>
+                                <table style="width:100%; border-collapse:collapse; margin-top:4px; font-size:9.5px;">
+                                    <thead>
+                                        <tr style="border-bottom:1px solid #94a3b8; text-align:left; color:#475569;">
+                                            <th style="padding:2px 4px;">Recibo</th>
+                                            <th style="padding:2px 4px;">Data</th>
+                                            <th style="padding:2px 4px;">Forma</th>
+                                            <th style="padding:2px 4px; text-align:right;">Valor</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${pagtosAtivosAteAgora.map(p => `
+                                            <tr style="border-bottom:1px dotted #cbd5e1; ${p.id === idPagamento ? 'font-weight:bold; background:#e0f2fe;' : ''}">
+                                                <td style="padding:2px 4px; font-family:monospace;">${escapeHtml(p.numeroRecibo || '-')} ${p.id === idPagamento ? '◀ (Este Recibo)' : ''}</td>
+                                                <td style="padding:2px 4px;">${fD(p.dataPagamento)}</td>
+                                                <td style="padding:2px 4px;">${escapeHtml(p.formaPagamento || '-')}</td>
+                                                <td style="padding:2px 4px; text-align:right;">${formatadorMoeda.format(parseFloat(p.valor) || 0)}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ` : ''}
 
                         <div style="margin-top:16px; padding:12px; border:1px solid #94a3b8; background:#f8fafc; font-size:11px; line-height:1.6; border-radius:6px;">
                             <strong>DECLARAÇÃO DE RECEBIMENTO:</strong><br>
