@@ -72,7 +72,16 @@ npm run tauri dev
 
 ---
 
-## 🔒 Segurança e Compatibilidade de Dados
-- **Zero Migração Destrutiva**: A coleção legada `/vales` permanece 100% intacta.
-- **Compatibilidade de Backup**: O sistema importa automaticamente backups antigos no formato v1 (array direto de vales) e backups no novo formato v2 (`{ schemaVersion: 2, vales: [], notasPrazo: [] }`) via restauração do tipo merge por ID sem perda de dados.
-- **Segurança de Credenciais**: As chaves ativas de produção e os dados dos clientes **não** fazem parte do Git (`.gitignore`).
+## 🔒 Segurança, Concorrência e Blindagem de Dados
+
+- **Proteção Concorrente de Baixas**: Baixas utilizam transações atômicas nativas do Firebase (`ref.transaction()`). O saldo real do servidor é revalidado no momento da gravação, impedindo que acessos simultâneos resultem em saldo negativo ou cobranças acima do valor devido.
+- **Idempotência (Proteção contra Duplo Clique)**: Cada tentativa de baixa gera um token único de idempotência (`IDEMP-...`). Cliques múltiplos ou requisições concorrentes são interceptados e retornam o recibo existente sem duplicar registros.
+- **Unicidade de Identificadores**: Geradores criptográficos garantem que números de controle (`NP-XXXXXXXX`) e recibos (`REC-XXXXXXXX`) sejam 100% únicos tanto em memória quanto no banco.
+- **Backup com Pré-Visualização e Merge Não-Destrutivo**:
+  - Antes da importação, uma tela de pré-visualização apresenta a contagem de registros novos, existentes e pagamentos a incorporar.
+  - A importação realiza **merge individualizado** por chave e subcoleção (`/pagamentos/{id}`).
+  - **Nunca** utiliza `set()` na nota inteira sobre registros existentes, impedindo que backups antigos apaguem pagamentos mais recentes efetuados em produção.
+  - Backups legados v1 (`[ { ... } ]`) continuam 100% suportados e restauráveis sem conflitos.
+- **Histórico Imutável e Auditoria**: Pagamentos confirmados não podem ser alterados diretamente. Correções são tratadas exclusivamente via **Estorno**, gerando um novo evento de auditoria com operador, data e justificativa obrigatória, recalculando o saldo e preservando o recibo original.
+- **Zero Migração Destrutiva**: A coleção legada `/vales` e seus layouts de impressão em meia folha A4 permanecem 100% intactos.
+- **Suíte de Testes Automatizados**: A suíte em `tests/run_all_audits.cjs` valida 20.000 IDs sem colisões, cenários concorrentes de pagamentos simultâneos, merge não-destrutivo de backups e compatibilidade com registros legados.
