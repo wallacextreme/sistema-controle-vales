@@ -706,6 +706,34 @@ async function simularBaixaConcorrente(bancoRef, valorPago, operador, chaveIdemp
     assert.strictEqual(calcularSituacaoNota(bancoIdemp.nota).saldo, 500, 'Saldo final R$ 500');
     console.log('✓ Sucesso: Retry com mesma idempotencyKey retorna recibo existente sem duplicar pagamento nem alterar saldo.');
 
+    // --- TESTE 9: AUDITORIA SEMÂNTICA DAS REGRAS (database.rules.json) ---
+    console.log('\n--- TESTE 9: AUDITORIA SEMÂNTICA E INTEGRIDADE DE database.rules.json ---');
+    const fs = require('fs');
+    const rulesObj = JSON.parse(fs.readFileSync('database.rules.json', 'utf8'));
+    assert(rulesObj.rules, 'Deve conter nó rules');
+    assert.strictEqual(rulesObj.rules['.read'], false, 'Root .read deve ser false');
+    assert.strictEqual(rulesObj.rules['.write'], false, 'Root .write deve ser false');
+
+    // Validação de notasPrazo
+    assert(rulesObj.rules.notasPrazo, 'Regra de notasPrazo deve existir');
+    assert.strictEqual(rulesObj.rules.notasPrazo['.read'], 'auth != null');
+    assert(rulesObj.rules.notasPrazo['$notaId'], 'Regra de $notaId deve existir');
+    assert.strictEqual(rulesObj.rules.notasPrazo['$notaId']['.write'], 'auth != null && (!data.exists() || newData.exists())');
+
+    // Validação de sequencias
+    assert(rulesObj.rules.sequencias, 'Regra de sequencias deve existir');
+    assert.strictEqual(rulesObj.rules.sequencias['.read'], 'auth != null');
+    assert(rulesObj.rules.sequencias.notasPrazo['.write'].includes('newData.val() > data.val()'), 'Sequencia notasPrazo deve ser estritamente crescente');
+    assert(rulesObj.rules.sequencias.recibos['.write'].includes('newData.val() > data.val()'), 'Sequencia recibos deve ser estritamente crescente');
+
+    // Validação de vales
+    assert(rulesObj.rules.vales, 'Regra de vales deve existir');
+    assert.strictEqual(rulesObj.rules.vales['.read'], 'auth != null');
+    assert(rulesObj.rules.vales['$valeId'], 'Regra de $valeId deve existir');
+    assert(rulesObj.rules.vales['$valeId']['.validate'].includes("newData.hasChildren(['valorOriginal']) || newData.hasChildren(['valor'])"), 'Deve suportar schema novo e legado de vales');
+
+    console.log('✓ Sucesso: Estrutura, restrições e expressões de database.rules.json verificadas com sucesso.');
+
     console.log('\n=================================================================');
     console.log('TODOS OS TESTES DE AUDITORIA E BLINDAGEM PASSARAM COM SUCESSO! 100% OK');
     console.log('=================================================================');

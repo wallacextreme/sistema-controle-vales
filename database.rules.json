@@ -32,8 +32,8 @@
       ".read": "auth != null",
       ".indexOn": ["numeroControle", "cliente", "dataVencimento", "status"],
       "$notaId": {
-        ".write": "auth != null",
-        ".validate": "newData.hasChildren(['id', 'valorOriginal', 'dataEmissao'])",
+        ".write": "auth != null && (!data.exists() || newData.exists())",
+        ".validate": "newData.hasChildren(['id', 'valorOriginal', 'dataEmissao']) && (!data.exists() || data.child('status').val() !== 'CANCELADA' || newData.val() === data.val())",
         "id": {
           ".validate": "newData.isString() && (!data.exists() || newData.val() === data.val())"
         },
@@ -48,7 +48,8 @@
         },
         "pagamentos": {
           "$pagtoId": {
-            ".validate": "newData.hasChildren(['id', 'valor', 'numeroRecibo'])",
+            ".write": "auth != null && newData.exists()",
+            ".validate": "newData.hasChildren(['id', 'valor', 'numeroRecibo']) && (!data.exists() ? (data.parent().parent().child('status').val() !== 'QUITADA' && data.parent().parent().child('status').val() !== 'CANCELADA') : true)",
             "id": {
               ".validate": "newData.isString() && (!data.exists() || newData.val() === data.val())"
             },
