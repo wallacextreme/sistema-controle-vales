@@ -5,6 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tucano Auto Peças - Sistema Cloud Oficial</title>
 
+    <!-- PWA META & MANIFEST -->
+    <meta name="theme-color" content="#0f172a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Tucano Cloud">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" type="image/svg+xml" href="app-icon.svg">
+    <link rel="apple-touch-icon" href="app-icon.svg">
+
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -71,6 +81,48 @@
                 padding-top: 6px;
                 font-size: 10.5px !important;
             }
+
+            /* IMPRESSÃO A4 MULTIPÁGINA - RELATÓRIOS ANALÍTICOS E EXTRATOS DE CLIENTES (FASE 3) */
+            .a4-print-relatorio {
+                width: 100%;
+                max-width: 210mm;
+                margin: 0 auto;
+                padding: 10mm 12mm;
+                box-sizing: border-box;
+                background: white !important;
+                color: black !important;
+                display: block !important;
+                font-family: 'Inter', sans-serif;
+            }
+            .a4-print-relatorio table {
+                width: 100%;
+                border-collapse: collapse;
+                page-break-inside: auto;
+            }
+            .a4-print-relatorio thead {
+                display: table-header-group;
+            }
+            .a4-print-relatorio tfoot {
+                display: table-footer-group;
+            }
+            .a4-print-relatorio tr {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            .a4-print-relatorio th {
+                position: static !important;
+                background: #f1f5f9 !important;
+                color: #000 !important;
+                padding: 6px 4px !important;
+                border-bottom: 2px solid #000 !important;
+                font-size: 10px !important;
+            }
+            .a4-print-relatorio td {
+                padding: 5px 4px !important;
+                border-bottom: 1px solid #cbd5e1 !important;
+                font-size: 10px !important;
+                color: #000 !important;
+            }
         }
         
         .print-only { display: none; }
@@ -122,6 +174,7 @@
                     </div>
                 </div>
                 <div class="flex gap-2">
+                    <button type="button" id="btnAbrirConfigEmpresa" onclick="abrirModalConfiguracoesEmpresa()" class="bg-slate-900 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm">⚙️ Empresa / PIX</button>
                     <button onclick="abrirPainelGerencial()" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg text-xs font-bold transition">📊 Painel de Controle</button>
                     <button onclick="realizarLogout()" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-xs font-bold transition">Sair</button>
                 </div>
@@ -129,7 +182,7 @@
         </header>
 
         <!-- BARRA DE SELEÇÃO DE MÓDULOS (ABAS) -->
-        <nav class="bg-slate-900/90 border-b border-slate-800 px-4 py-2.5 sticky top-[73px] z-30 no-print backdrop-blur">
+        <nav class="bg-slate-900/95 border-b border-slate-800 px-4 py-2.5 z-30 no-print backdrop-blur">
             <div class="container mx-auto flex items-center justify-between gap-4 flex-wrap">
                 <div class="flex items-center gap-2">
                     <button id="btnAbaVales" onclick="alternarAbaPrincipal('vales')" class="px-5 py-2.5 rounded-xl font-bold text-xs transition-all duration-200 flex items-center gap-2 bg-blue-600 text-white shadow-lg shadow-blue-600/30">
@@ -216,46 +269,93 @@
 
             <!-- ABA 2: NOTAS A PRAZO / CONTAS A RECEBER -->
             <div id="abaConteudoNotasPrazo" class="hidden space-y-6">
-                <div class="grid lg:grid-cols-12 gap-6">
-                    <!-- FORMULÁRIO NOVA NOTA A PRAZO -->
-                    <div class="lg:col-span-4">
-                        <section class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
-                            <div class="flex items-center justify-between mb-5">
-                                <h2 class="text-lg font-bold flex items-center gap-2 text-indigo-400">
-                                    <span>📅</span> Nova Nota a Prazo
-                                </h2>
-                                <span class="text-[10px] bg-indigo-500/20 text-indigo-300 px-2.5 py-1 rounded-full font-bold border border-indigo-500/30">A RECEBER</span>
-                            </div>
-                            <form id="formCadastroNotaPrazo" class="space-y-4">
-                                <div class="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Emissão</label>
-                                        <input type="date" id="campoNotaDataEmissao" required onchange="aoMudarDataOuPrazoNota()" class="w-full bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm text-white">
-                                    </div>
-                                    <div>
-                                        <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Prazo (Dias)</label>
-                                        <input type="number" id="campoNotaPrazoDias" value="30" min="1" max="365" required oninput="aoMudarDataOuPrazoNota()" class="w-full bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm text-white">
-                                    </div>
-                                </div>
+                <!-- SUB-NAVEGAÇÃO NOTAS A PRAZO & CLIENTES -->
+                <div class="bg-slate-800/80 backdrop-blur-md p-2 rounded-2xl border border-slate-700/80 shadow-lg flex flex-wrap justify-between items-center gap-3">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <button type="button" id="btnSubAbaLancamentos" onclick="alternarSubAbaNotasPrazo('lancamentos')" class="px-4 py-2 rounded-xl font-bold text-xs transition-all duration-200 flex items-center gap-2 bg-indigo-600 text-white shadow-md">
+                            <span>📋</span> Lançamentos & Notas
+                        </button>
+                        <button type="button" id="btnSubAbaClientes" onclick="alternarSubAbaNotasPrazo('clientes')" class="px-4 py-2 rounded-xl font-bold text-xs transition-all duration-200 flex items-center gap-2 bg-slate-900 text-slate-300 hover:bg-slate-700 hover:text-white">
+                            <span>👥</span> Clientes & Carteira
+                        </button>
+                        <button type="button" id="btnSubAbaNotasRelatorios" onclick="alternarSubAbaNotasPrazo('relatorios')" class="px-4 py-2 rounded-xl font-bold text-xs transition-all duration-200 flex items-center gap-2 bg-slate-900 text-slate-300 hover:bg-slate-700 hover:text-white">
+                            <span>📊</span> Relatórios & Auto-Soma
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <button type="button" id="btnConciliacaoRapida" onclick="abrirModalConciliacaoClientes()" class="bg-slate-900 hover:bg-slate-700 text-slate-300 hover:text-white px-3 py-2 rounded-xl text-xs font-bold border border-slate-700 transition flex items-center gap-1.5 shadow-sm">
+                            <span>🔄</span> Vincular Notas Antigas
+                            <span id="badgeNotasSemVinculo" class="hidden bg-amber-500 text-slate-900 text-[10px] px-1.5 py-0.5 rounded-full font-black">0</span>
+                        </button>
+                        <button type="button" onclick="abrirModalFormCliente()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-md shadow-emerald-600/30 transition flex items-center gap-1.5">
+                            <span>➕</span> Novo Cliente
+                        </button>
+                    </div>
+                </div>
 
-                                <div>
-                                    <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Data de Vencimento</label>
-                                    <input type="date" id="campoNotaDataVencimento" required class="w-full bg-slate-900 border border-indigo-500/60 p-2 rounded-lg text-sm text-indigo-300 font-bold bg-indigo-950/30">
+                <!-- SUB-ABA 1: LANÇAMENTOS E DASHBOARD (VISÃO PADRÃO) -->
+                <div id="subAbaConteudoLancamentos" class="space-y-6">
+                    <div class="grid lg:grid-cols-12 gap-6">
+                        <!-- FORMULÁRIO NOVA NOTA A PRAZO -->
+                        <div class="lg:col-span-4">
+                            <section class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
+                                <div class="flex items-center justify-between mb-5">
+                                    <h2 class="text-lg font-bold flex items-center gap-2 text-indigo-400">
+                                        <span>📅</span> Nova Nota a Prazo
+                                    </h2>
+                                    <span class="text-[10px] bg-indigo-500/20 text-indigo-300 px-2.5 py-1 rounded-full font-bold border border-indigo-500/30">A RECEBER</span>
                                 </div>
+                                <form id="formCadastroNotaPrazo" class="space-y-4">
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Emissão</label>
+                                            <input type="date" id="campoNotaDataEmissao" required onchange="aoMudarDataOuPrazoNota()" class="w-full bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm text-white">
+                                        </div>
+                                        <div>
+                                            <div class="flex justify-between items-center mb-1">
+                                                <label class="block text-[10px] uppercase font-bold text-slate-400">Prazo (Dias)</label>
+                                                <div class="flex gap-1">
+                                                    <button type="button" onclick="definirPrazoRapidoNota(10)" id="btnPrazo10d" class="px-2 py-0.5 rounded text-[10px] font-bold transition bg-slate-700 hover:bg-slate-600 text-slate-300">10d</button>
+                                                    <button type="button" onclick="definirPrazoRapidoNota(15)" id="btnPrazo15d" class="px-2 py-0.5 rounded text-[10px] font-bold transition bg-slate-700 hover:bg-slate-600 text-slate-300">15d</button>
+                                                    <button type="button" onclick="definirPrazoRapidoNota(30)" id="btnPrazo30d" class="px-2 py-0.5 rounded text-[10px] font-bold transition bg-indigo-600 text-white shadow-sm">30d</button>
+                                                </div>
+                                            </div>
+                                            <input type="number" id="campoNotaPrazoDias" value="30" min="1" max="365" required oninput="aoMudarDataOuPrazoNota()" class="w-full bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm text-white">
+                                        </div>
+                                    </div>
 
-                                <div>
-                                    <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Cliente *</label>
-                                    <input type="text" id="campoNotaCliente" placeholder="Nome Completo do Cliente" required class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm text-white">
-                                </div>
+                                    <div>
+                                        <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Data de Vencimento</label>
+                                        <input type="date" id="campoNotaDataVencimento" required class="w-full bg-slate-900 border border-indigo-500/60 p-2 rounded-lg text-sm text-indigo-300 font-bold bg-indigo-950/30">
+                                    </div>
+
+                                    <div>
+                                        <div class="flex justify-between items-center mb-2 gap-2 flex-wrap">
+                                            <label class="block text-[10px] uppercase font-bold text-slate-400">Cliente *</label>
+                                            <button type="button" onclick="abrirModalFormCliente(null, document.getElementById('campoNotaCliente').value)" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 flex items-center gap-1.5 transition">
+                                                <span>➕</span> Cadastrar Cliente
+                                            </button>
+                                        </div>
+                                        <div class="mb-2">
+                                            <select id="selectClienteCadastradoNota" onchange="aoSelecionarClientePeloSelect(this.value)" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-xs text-white outline-none focus:border-indigo-500 font-medium">
+                                                <option value="">-- 📋 Escolher Cliente Cadastrado (Ficha) --</option>
+                                            </select>
+                                        </div>
+                                        <input type="hidden" id="campoNotaClienteId">
+                                        <input type="text" id="campoNotaCliente" list="listaClientesAutocomplete" oninput="aoSelecionarOuDigitarClienteNota()" placeholder="Ou digite o nome / código do cliente..." required class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-sm text-white" autocomplete="off">
+                                        <datalist id="listaClientesAutocomplete"></datalist>
+                                        <!-- RESUMO DO CLIENTE SELECIONADO -->
+                                        <div id="boxResumoClienteNota" class="hidden mt-2"></div>
+                                    </div>
 
                                 <div class="grid grid-cols-2 gap-3">
                                     <div>
                                         <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">CPF / CNPJ</label>
-                                        <input type="text" id="campoNotaCpfCnpj" placeholder="Opcional" class="w-full bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm text-white">
+                                        <input type="text" id="campoNotaCpfCnpj" oninput="this.value = formatarCpfCnpjEmTempoReal(this.value)" placeholder="Opcional" class="w-full bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm text-white">
                                     </div>
                                     <div>
                                         <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Telefone / WhatsApp</label>
-                                        <input type="text" id="campoNotaTelefone" placeholder="(00) 00000-0000" class="w-full bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm text-white">
+                                        <input type="text" id="campoNotaTelefone" oninput="this.value = formatarTelefoneEmTempoReal(this.value)" placeholder="(00) 00000-0000" class="w-full bg-slate-900 border border-slate-700 p-2 rounded-lg text-sm text-white">
                                     </div>
                                 </div>
                                 
@@ -369,7 +469,269 @@
                         </div>
                     </div>
                 </div>
-            </div><!-- FIM ABA 2: NOTAS A PRAZO -->
+            </div><!-- FIM SUB-ABA 1: LANÇAMENTOS -->
+
+            <!-- SUB-ABA 2: CARTEIRA DE CLIENTES -->
+            <div id="subAbaConteudoClientes" class="hidden space-y-6">
+                <!-- CARDS RESUMO CARTEIRA -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-md">
+                        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total de Clientes</div>
+                        <div id="cardCarteiraTotalClientes" class="text-xl font-extrabold text-indigo-400 mt-1">0</div>
+                    </div>
+                    <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-md">
+                        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Com Saldo Devedor</div>
+                        <div id="cardCarteiraComSaldo" class="text-xl font-extrabold text-amber-400 mt-1">0</div>
+                    </div>
+                    <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-md">
+                        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Com Notas Vencidas</div>
+                        <div id="cardCarteiraComVencidas" class="text-xl font-extrabold text-red-400 mt-1">0</div>
+                    </div>
+                    <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-md">
+                        <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Saldo Devedor Geral</div>
+                        <div id="cardCarteiraSaldoGeral" class="text-xl font-extrabold text-emerald-400 mt-1">R$ 0,00</div>
+                    </div>
+                </div>
+
+                <!-- BUSCA E FILTROS RÁPIDOS DA CARTEIRA -->
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <input type="text" id="inputFiltroBuscaClientes" oninput="atualizarTabelaCarteiraClientes()" placeholder="🔍 Pesquisar cliente por nome, código, CPF/CNPJ ou telefone..." class="flex-1 bg-slate-800 border border-slate-700 px-5 py-3.5 rounded-2xl text-white outline-none">
+                    
+                    <div class="flex gap-1.5 flex-wrap items-center">
+                        <button type="button" onclick="definirFiltroCarteiraClientes('todos')" id="filtroCarteira_todos" class="px-3 py-2 rounded-xl text-xs font-bold transition bg-indigo-600 text-white">Todos</button>
+                        <button type="button" onclick="definirFiltroCarteiraClientes('comSaldo')" id="filtroCarteira_comSaldo" class="px-3 py-2 rounded-xl text-xs font-bold transition bg-slate-800 hover:bg-slate-700 text-slate-300">Com Saldo</button>
+                        <button type="button" onclick="definirFiltroCarteiraClientes('vencidos')" id="filtroCarteira_vencidos" class="px-3 py-2 rounded-xl text-xs font-bold transition bg-slate-800 hover:bg-slate-700 text-slate-300">Vencidos</button>
+                        <button type="button" onclick="definirFiltroCarteiraClientes('semSaldo')" id="filtroCarteira_semSaldo" class="px-3 py-2 rounded-xl text-xs font-bold transition bg-slate-800 hover:bg-slate-700 text-slate-300">Sem Saldo</button>
+                        <button type="button" onclick="definirFiltroCarteiraClientes('limiteExcedido')" id="filtroCarteira_limiteExcedido" class="px-3 py-2 rounded-xl text-xs font-bold transition bg-slate-800 hover:bg-slate-700 text-slate-300">Limite Excedido</button>
+                    </div>
+                </div>
+
+                <!-- TABELA DE CARTEIRA DE CLIENTES -->
+                <div class="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden shadow-2xl">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-900/60 text-[10px] uppercase font-bold text-slate-400">
+                                <tr>
+                                    <th class="p-3.5">Código</th>
+                                    <th>Cliente</th>
+                                    <th>Limite Crédito</th>
+                                    <th>Total Comprado</th>
+                                    <th>Total Já Pago</th>
+                                    <th>Saldo Devedor</th>
+                                    <th>Situação</th>
+                                    <th class="text-right p-3.5">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelaCorpoCarteiraClientes" class="text-sm divide-y divide-slate-700/50"></tbody>
+                            <tfoot id="tabelaRodapeCarteiraAutoSoma" class="bg-slate-900/90 text-xs font-bold text-slate-200 border-t-2 border-slate-700 hidden">
+                                <tr>
+                                    <td colspan="3" class="p-3 uppercase text-slate-400">Auto-Soma da Carteira:</td>
+                                    <td id="autoSomaCarteiraComprado" class="text-slate-300">R$ 0,00</td>
+                                    <td id="autoSomaCarteiraPago" class="text-emerald-400">R$ 0,00</td>
+                                    <td id="autoSomaCarteiraSaldo" class="text-amber-400 font-extrabold text-sm">R$ 0,00</td>
+                                    <td colspan="2"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div><!-- FIM SUB-ABA 2: CARTEIRA -->
+
+            <!-- SUB-ABA 3: RELATÓRIOS DETALHADOS & AUTO-SOMA (FASE 2) -->
+            <div id="subAbaNotasRelatorios" class="hidden space-y-6">
+                <!-- PAINEL DE CONTROLE DE FILTROS DO RELATÓRIO -->
+                <div class="bg-slate-800/80 backdrop-blur-md p-5 rounded-2xl border border-slate-700/80 shadow-xl space-y-4">
+                    <div class="flex flex-wrap justify-between items-center gap-3 border-b border-slate-700/80 pb-4">
+                        <div>
+                            <h2 class="text-lg font-black text-white flex items-center gap-2">
+                                <span>📊</span> Relatórios Analíticos & Auto-Soma
+                            </h2>
+                            <p class="text-xs text-slate-400 mt-0.5">
+                                Filtragem combinável, reconciliação em centavos e exportação instantânea • <span id="relatorioPeriodoDescricao" class="text-indigo-400 font-bold">Todo o Período</span>
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <button type="button" onclick="imprimirRelatorioAtualA4()" class="bg-slate-900 hover:bg-slate-700 text-slate-200 px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-700 shadow-sm transition flex items-center gap-1.5">
+                                <span>🖨️</span> Imprimir Relatório (A4)
+                            </button>
+                            <button type="button" onclick="exportarRelatorioAtualCSV()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-md shadow-emerald-600/30 transition flex items-center gap-1.5">
+                                <span>📥</span> Exportar CSV (Excel)
+                            </button>
+                            <button type="button" id="btnZapTodasNotasRelatorio" onclick="enviarWhatsAppTodasNotasFiltradas()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-md shadow-emerald-600/30 transition flex items-center gap-1.5" title="Enviar lista de notas filtradas + auto-soma consolidada no WhatsApp">
+                                <span>📲</span> Enviar Todas as Notas Filtradas (WhatsApp)
+                            </button>
+                            <button type="button" id="btnZapRelatorioAtual" onclick="enviarWhatsAppRelatorioAtual()" class="bg-slate-900 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold shadow-sm transition flex items-center gap-1.5" title="Enviar Resumo Executivo do Relatório no WhatsApp">
+                                <span>📈</span> Resumo Executivo (WhatsApp)
+                            </button>
+                            <button type="button" onclick="limparFiltrosRelatorio()" class="bg-slate-900 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-xs font-bold border border-slate-700 transition flex items-center gap-1">
+                                <span>🔄</span> Limpar Filtros
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- LINHA 1: TIPO DE RELATÓRIO E ATALHOS DE PERÍODO -->
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
+                        <div class="lg:col-span-4">
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Tipo de Relatório</label>
+                            <select id="selectTipoRelatorio" onchange="aoAlterarFiltrosRelatorio()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="NOTAS_VENCIMENTO">📅 Notas por Vencimento / Contas a Receber</option>
+                                <option value="RECEBIMENTOS_PAGAMENTOS">💵 Recebimentos por Data de Pagamento (Caixa)</option>
+                                <option value="NOTAS_GERAL">📋 Relatório Geral de Notas Emitidas</option>
+                                <option value="CLIENTES_POSICAO">👥 Posição Consolidada por Cliente</option>
+                            </select>
+                        </div>
+                        <div class="lg:col-span-8">
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Atalhos Rápidos de Período</label>
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <button type="button" id="btnAtalhoRel_TODOS" onclick="aplicarAtalhoPeriodoRelatorio('TODOS')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition bg-indigo-600 text-white shadow">Todo o Período</button>
+                                <button type="button" id="btnAtalhoRel_HOJE" onclick="aplicarAtalhoPeriodoRelatorio('HOJE')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition bg-slate-800 hover:bg-slate-700 text-slate-300">Hoje</button>
+                                <button type="button" id="btnAtalhoRel_ONTEM" onclick="aplicarAtalhoPeriodoRelatorio('ONTEM')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition bg-slate-800 hover:bg-slate-700 text-slate-300">Ontem</button>
+                                <button type="button" id="btnAtalhoRel_ULTIMOS_7_DIAS" onclick="aplicarAtalhoPeriodoRelatorio('ULTIMOS_7_DIAS')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition bg-slate-800 hover:bg-slate-700 text-slate-300">7 Dias</button>
+                                <button type="button" id="btnAtalhoRel_ULTIMOS_30_DIAS" onclick="aplicarAtalhoPeriodoRelatorio('ULTIMOS_30_DIAS')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition bg-slate-800 hover:bg-slate-700 text-slate-300">30 Dias</button>
+                                <button type="button" id="btnAtalhoRel_MES_ATUAL" onclick="aplicarAtalhoPeriodoRelatorio('MES_ATUAL')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition bg-slate-800 hover:bg-slate-700 text-slate-300">Este Mês</button>
+                                <button type="button" id="btnAtalhoRel_MES_ANTERIOR" onclick="aplicarAtalhoPeriodoRelatorio('MES_ANTERIOR')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition bg-slate-800 hover:bg-slate-700 text-slate-300">Mês Passado</button>
+                                <button type="button" id="btnAtalhoRel_ANO_ATUAL" onclick="aplicarAtalhoPeriodoRelatorio('ANO_ATUAL')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition bg-slate-800 hover:bg-slate-700 text-slate-300">Este Ano</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- LINHA 2: FILTROS COMBINÁVEIS DE DATA, CLIENTE E CRITÉRIOS -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Base da Data</label>
+                            <select id="selectBaseDataRelatorio" onchange="aoAlterarFiltrosRelatorio()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="VENCIMENTO">Data de Vencimento</option>
+                                <option value="EMISSAO">Data de Emissão</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Data Inicial</label>
+                            <input type="date" id="inputDataInicioRelatorio" onchange="aoAlterarFiltrosRelatorio()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Data Final</label>
+                            <input type="date" id="inputDataFimRelatorio" onchange="aoAlterarFiltrosRelatorio()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Filtrar por Cliente</label>
+                            <select id="selectFiltroClienteRelatorio" onchange="aoAlterarFiltrosRelatorio()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="TODOS">Todos os Clientes</option>
+                            </select>
+                        </div>
+
+                        <!-- FILTROS ESPECÍFICOS DE NOTAS -->
+                        <div id="boxFiltrosEspecificosNotas" class="contents">
+                            <div>
+                                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Status da Nota</label>
+                                <select id="selectFiltroStatusRelatorio" onchange="aoAlterarFiltrosRelatorio()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <option value="TODAS">Todos os Status</option>
+                                    <option value="PENDENTES">Pendentes (Aberta / Parcial)</option>
+                                    <option value="ABERTA">Aberta (Sem pagamentos)</option>
+                                    <option value="PARCIAL">Parcialmente Paga</option>
+                                    <option value="VENCENDO">Vencendo Hoje</option>
+                                    <option value="VENCIDA">Vencida em Atraso</option>
+                                    <option value="QUITADA">Quitada</option>
+                                    <option value="CANCELADA">Cancelada</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Faixa de Atraso</label>
+                                <select id="selectFiltroFaixaRelatorio" onchange="aoAlterarFiltrosRelatorio()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <option value="TODAS">Todas as Faixas</option>
+                                    <option value="A_VENCER">A Vencer (Futuras)</option>
+                                    <option value="VENCE_HOJE">Vence Hoje</option>
+                                    <option value="ATRASO_1_30">1 a 30 dias de atraso</option>
+                                    <option value="ATRASO_31_60">31 a 60 dias de atraso</option>
+                                    <option value="ATRASO_61_90">61 a 90 dias de atraso</option>
+                                    <option value="ATRASO_MAIS_90">Mais de 90 dias de atraso</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- FILTROS ESPECÍFICOS DE PAGAMENTOS (FLUXO DE CAIXA) -->
+                        <div id="boxFiltrosEspecificosPagtos" class="contents hidden">
+                            <div>
+                                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Forma de Pagamento</label>
+                                <select id="selectFiltroFormaRelatorio" onchange="aoAlterarFiltrosRelatorio()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <option value="TODAS">Todas as Formas</option>
+                                    <option value="Dinheiro">Dinheiro</option>
+                                    <option value="PIX">PIX</option>
+                                    <option value="Cartão de Débito">Cartão de Débito</option>
+                                    <option value="Cartão de Crédito">Cartão de Crédito</option>
+                                    <option value="Transferência">Transferência</option>
+                                    <option value="Boleto">Boleto</option>
+                                    <option value="Outro">Outro</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Status da Baixa</label>
+                                <select id="selectFiltroStatusPagamentoRelatorio" onchange="aoAlterarFiltrosRelatorio()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <option value="ATIVOS">Apenas Baixas Ativas</option>
+                                    <option value="ESTORNADOS">Apenas Estornadas</option>
+                                    <option value="TODOS">Todas (Ativas + Estornadas)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- LINHA 3: CAMPO DE BUSCA RÁPIDA -->
+                    <div>
+                        <input type="text" id="inputBuscaRelatorio" oninput="aoAlterarFiltrosRelatorio()" placeholder="🔍 Busca textual rápida (nº de controle, cliente, pedido, documento, CPF/CNPJ, telefone ou observação)..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+
+                <!-- CARDS DE AUTO-SOMA EM TEMPO REAL -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div id="relatorioCardKpi1" class="bg-slate-800/80 backdrop-blur-md p-4 rounded-2xl border border-slate-700/80 shadow-lg">
+                        <div class="text-[10px] uppercase font-bold text-slate-400">Total de Registros</div>
+                        <div class="text-xl font-extrabold text-indigo-400 mt-1">0</div>
+                    </div>
+                    <div id="relatorioCardKpi2" class="bg-slate-800/80 backdrop-blur-md p-4 rounded-2xl border border-slate-700/80 shadow-lg">
+                        <div class="text-[10px] uppercase font-bold text-slate-400">Valor Original Líquido</div>
+                        <div class="text-xl font-extrabold text-blue-400 mt-1">R$ 0,00</div>
+                    </div>
+                    <div id="relatorioCardKpi3" class="bg-slate-800/80 backdrop-blur-md p-4 rounded-2xl border border-slate-700/80 shadow-lg">
+                        <div class="text-[10px] uppercase font-bold text-slate-400">Total Já Recebido</div>
+                        <div class="text-xl font-extrabold text-emerald-400 mt-1">R$ 0,00</div>
+                    </div>
+                    <div id="relatorioCardKpi4" class="bg-slate-800/80 backdrop-blur-md p-4 rounded-2xl border border-slate-700/80 shadow-lg">
+                        <div class="text-[10px] uppercase font-bold text-slate-400">Saldo Devedor Pendente</div>
+                        <div class="text-xl font-extrabold text-amber-400 mt-1">R$ 0,00</div>
+                    </div>
+                </div>
+
+                <!-- PAINEL SECUNDÁRIO DINÂMICO (AGING DE VENCIMENTO OU FORMAS DE PAGAMENTO) -->
+                <div id="painelSubtotaisRelatorio"></div>
+
+                <!-- TABELA ANALÍTICA COM AUTO-SOMA NO CABEÇALHO/RODAPÉ -->
+                <div class="bg-slate-800/80 backdrop-blur-md rounded-2xl border border-slate-700/80 shadow-xl overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead id="tabelaCabecalhoRelatorios" class="bg-slate-900/90 text-slate-400 text-xs uppercase font-bold sticky top-0 z-10 border-b border-slate-700">
+                                <tr>
+                                    <th class="p-3">Nº Controle</th>
+                                    <th>Cliente</th>
+                                    <th>Emissão</th>
+                                    <th>Vencimento</th>
+                                    <th>Situação</th>
+                                    <th>Atraso</th>
+                                    <th class="text-right">Valor Original</th>
+                                    <th class="text-right">Total Recebido</th>
+                                    <th class="text-right">Saldo Devedor</th>
+                                    <th class="text-right p-3">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelaCorpoRelatoriosNotas" class="divide-y divide-slate-700/50">
+                                <tr>
+                                    <td colspan="10" class="p-8 text-center text-slate-400 italic">Carregando relatório analítico...</td>
+                                </tr>
+                            </tbody>
+                            <tfoot id="tabelaRodapeAutoSomaRelatorios" class="hidden"></tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div><!-- FIM SUB-ABA 3: RELATÓRIOS -->
+        </div><!-- FIM ABA 2: NOTAS A PRAZO -->
         </main>
     </div>
 
@@ -611,10 +973,340 @@
                 <div id="extratoNotaStatusBadge" class="text-xs font-bold"></div>
                 <div class="flex gap-2 flex-wrap">
                     <button id="btnImprimirNotaA4" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl text-xs font-bold text-white transition flex items-center gap-1.5">🖨️ Imprimir Nota (A4)</button>
+                    <button id="btnZapPeloExtrato" class="bg-emerald-700 hover:bg-emerald-600 px-4 py-2 rounded-xl text-xs font-bold text-white transition flex items-center gap-1.5 shadow">📲 WhatsApp</button>
                     <button id="btnBaixarPeloExtrato" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl text-xs font-bold text-white transition flex items-center gap-1.5">💵 Novo Pagamento</button>
                     <button onclick="fecharModalExtratoNota()" class="bg-indigo-600 hover:bg-indigo-700 px-5 py-2 rounded-xl text-xs font-bold text-white transition">Concluir</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- MODAL CADASTRO / EDIÇÃO DE CLIENTE (FASE 1) -->
+    <div id="modalCadastroCliente" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm hidden z-[95] flex items-center justify-center p-4 no-print">
+        <div class="bg-slate-800 w-full max-w-lg rounded-3xl border border-slate-700 shadow-2xl p-6 flex flex-col max-h-[95vh] overflow-y-auto custom-scrollbar">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-4 mb-4">
+                <h3 id="tituloModalCadastroCliente" class="font-bold text-xl text-white flex items-center gap-2">
+                    <span>👥</span> Novo Cliente
+                </h3>
+                <button type="button" onclick="fecharModalFormCliente()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white px-3 py-1.5 rounded-xl text-xs font-bold transition">✕ Fechar</button>
+            </div>
+            <form id="formCadastroClienteModal" onsubmit="salvarCadastroClienteModal(event)" class="space-y-4">
+                <input type="hidden" id="campoClienteId">
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="col-span-1">
+                        <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Código</label>
+                        <input type="text" id="campoClienteCodigo" readonly disabled class="w-full bg-slate-900/60 border border-slate-700 p-2.5 rounded-xl text-sm font-mono font-bold text-indigo-400">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Nome Completo *</label>
+                        <input type="text" id="campoClienteNome" required placeholder="Nome do Cliente" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-sm text-white outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">CPF / CNPJ</label>
+                        <input type="text" id="campoClienteCpfCnpj" oninput="this.value = formatarCpfCnpjEmTempoReal(this.value)" placeholder="Opcional" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-sm text-white outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Telefone / WhatsApp</label>
+                        <input type="text" id="campoClienteTelefone" oninput="this.value = formatarTelefoneEmTempoReal(this.value)" placeholder="(00) 00000-0000" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-sm text-white outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Limite de Crédito (R$)</label>
+                    <input type="text" id="campoClienteLimiteCredito" placeholder="R$ 0,00 (0 para sem limite)" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-sm font-bold text-emerald-400 outline-none focus:border-emerald-500">
+                    <span class="text-[10px] text-slate-400">Deixe em branco ou R$ 0,00 se não houver teto de crédito para este cliente.</span>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Endereço Completo</label>
+                    <input type="text" id="campoClienteEndereco" placeholder="Rua, número, bairro, cidade" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-sm text-white outline-none focus:border-indigo-500">
+                </div>
+
+                <div>
+                    <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Observações</label>
+                    <textarea id="campoClienteObservacao" rows="2" placeholder="Observações internas..." class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-sm text-white outline-none focus:border-indigo-500"></textarea>
+                </div>
+
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="fecharModalFormCliente()" class="flex-1 bg-slate-700 hover:bg-slate-600 py-3 rounded-xl font-bold text-xs transition">Cancelar</button>
+                    <button type="submit" id="btnSalvarClienteModal" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl font-bold text-xs shadow-lg shadow-indigo-600/30 transition">SALVAR CLIENTE</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL FICHA COMPLETA DO CLIENTE (FASE 1) -->
+    <div id="modalFichaCliente" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm hidden z-[80] flex items-center justify-center p-4 no-print">
+        <div class="bg-slate-800 w-full max-w-4xl rounded-3xl border border-slate-700 shadow-2xl p-6 flex flex-col max-h-[95vh] overflow-hidden">
+            <!-- CABEÇALHO DA FICHA -->
+            <div class="flex justify-between items-start border-b border-slate-700 pb-4 gap-4 flex-wrap">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span id="fichaClienteCodigo" class="text-xs font-mono font-bold text-indigo-400 bg-indigo-950/60 border border-indigo-500/40 px-2 py-0.5 rounded">CLI-0000</span>
+                        <h3 id="fichaClienteNome" class="font-bold text-xl text-white">Nome do Cliente</h3>
+                    </div>
+                    <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400 mt-1">
+                        <span id="fichaClienteDocumento">Documento não informado</span>
+                        <span id="fichaClienteTelefone">Telefone não informado</span>
+                        <span id="fichaClienteEndereco"></span>
+                    </div>
+                    <div id="fichaClienteObservacao" class="text-xs text-slate-400 mt-1 italic"></div>
+                </div>
+                <div class="flex gap-2 flex-wrap items-center">
+                    <button type="button" id="btnFichaWhatsAppTodasNotas" onclick="enviarWhatsAppTodasNotasCliente(clienteIdFichaAtual)" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-xl text-xs font-bold text-white transition flex items-center gap-1.5 shadow" title="Enviar todas as notas pendentes deste cliente juntas com auto-soma">📲 Enviar Todas as Notas Juntas</button>
+                    <button type="button" id="btnFichaWhatsAppExtrato" onclick="enviarWhatsAppExtratoCliente(clienteIdFichaAtual)" class="bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-xl text-xs font-bold text-white transition flex items-center gap-1.5 shadow">📲 Extrato WhatsApp</button>
+                    <button type="button" id="btnFichaWhatsAppCobranca" onclick="enviarWhatsAppCobrancaCliente(clienteIdFichaAtual)" class="bg-amber-700 hover:bg-amber-600 px-3 py-1.5 rounded-xl text-xs font-bold text-white transition flex items-center gap-1.5 shadow">📲 Cobrança WhatsApp</button>
+                    <button type="button" id="btnFichaImprimirExtrato" onclick="dispararImpressaoExtratoClienteA4(clienteIdFichaAtual)" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-xl text-xs font-bold text-white transition flex items-center gap-1.5 shadow">🖨️ Extrato A4</button>
+                    <button type="button" id="btnFichaEditarCliente" onclick="editarClienteDaFichaAtual()" class="bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 rounded-xl text-xs font-bold text-white transition flex items-center gap-1.5 shadow" title="Alterar Nome, Telefone/WhatsApp, CPF/CNPJ, Endereço ou Limite de Crédito deste cliente">✏️ Editar Cadastro do Cliente</button>
+                    <button type="button" onclick="fecharModalFichaCliente()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white px-3 py-1.5 rounded-xl text-xs font-bold transition">✕ Fechar</button>
+                </div>
+            </div>
+
+            <!-- CARDS DE TOTALIZADORES FINANCEIROS DO CLIENTE -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4">
+                <div class="bg-slate-900/60 p-3 rounded-2xl border border-slate-700/60">
+                    <div class="text-[10px] uppercase font-bold text-slate-400">Total Comprado</div>
+                    <div id="fichaKpiTotalComprado" class="text-base font-bold text-slate-200 mt-0.5">R$ 0,00</div>
+                </div>
+                <div class="bg-slate-900/60 p-3 rounded-2xl border border-slate-700/60">
+                    <div class="text-[10px] uppercase font-bold text-slate-400">Total Já Pago</div>
+                    <div id="fichaKpiTotalPago" class="text-base font-bold text-emerald-400 mt-0.5">R$ 0,00</div>
+                </div>
+                <div class="bg-slate-900/60 p-3 rounded-2xl border border-slate-700/60">
+                    <div class="text-[10px] uppercase font-bold text-slate-400">Saldo Devedor Atual</div>
+                    <div id="fichaKpiSaldoDevedor" class="text-xl font-extrabold text-amber-400 mt-0.5">R$ 0,00</div>
+                </div>
+                <div class="bg-slate-900/60 p-3 rounded-2xl border border-slate-700/60">
+                    <div class="text-[10px] uppercase font-bold text-slate-400">Limite de Crédito</div>
+                    <div id="fichaKpiLimiteCredito" class="text-xs font-semibold text-slate-300 mt-0.5">Sem Limite</div>
+                </div>
+            </div>
+
+            <!-- TABELAS COM SCROLL: NOTAS DO CLIENTE & HISTÓRICO DE PAGAMENTOS -->
+            <div class="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1">
+                <!-- SEÇÃO NOTAS DO CLIENTE -->
+                <div class="bg-slate-900/40 rounded-2xl border border-slate-700/60 p-3">
+                    <div class="text-xs font-bold uppercase text-slate-300 mb-2 flex justify-between items-center">
+                        <span>📅 Notas a Prazo do Cliente</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-900/80 text-[10px] uppercase font-bold text-slate-400">
+                                <tr>
+                                    <th class="p-2">Nº Nota</th>
+                                    <th>Emissão</th>
+                                    <th>Vencimento</th>
+                                    <th>Valor Original</th>
+                                    <th>Pago</th>
+                                    <th>Saldo</th>
+                                    <th>Situação</th>
+                                    <th class="text-right p-2">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelaCorpoFichaNotasCliente" class="divide-y divide-slate-800"></tbody>
+                            <tfoot class="bg-slate-900/90 text-xs font-bold border-t border-slate-700">
+                                <tr>
+                                    <td colspan="3" class="p-2 uppercase text-slate-400">Auto-Soma Notas:</td>
+                                    <td id="fichaAutoSomaNotasOriginal" class="text-slate-200">R$ 0,00</td>
+                                    <td id="fichaAutoSomaNotasPago" class="text-emerald-400">R$ 0,00</td>
+                                    <td id="fichaAutoSomaNotasSaldo" class="text-amber-400 font-extrabold">R$ 0,00</td>
+                                    <td colspan="2"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- SEÇÃO PAGAMENTOS DO CLIENTE -->
+                <div class="bg-slate-900/40 rounded-2xl border border-slate-700/60 p-3">
+                    <div class="text-xs font-bold uppercase text-slate-300 mb-2">
+                        <span>💵 Histórico de Pagamentos e Recibos</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-900/80 text-[10px] uppercase font-bold text-slate-400">
+                                <tr>
+                                    <th class="p-2">Nº Recibo</th>
+                                    <th>Data</th>
+                                    <th>Nota Ref.</th>
+                                    <th>Forma</th>
+                                    <th>Valor Pago</th>
+                                    <th class="text-right p-2">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelaCorpoFichaPagamentosCliente" class="divide-y divide-slate-800"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RODAPÉ DA FICHA -->
+            <div class="flex justify-end pt-3 border-t border-slate-700 mt-3">
+                <button type="button" onclick="fecharModalFichaCliente()" class="bg-indigo-600 hover:bg-indigo-700 px-6 py-2 rounded-xl text-xs font-bold text-white transition">Concluir</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL CONCILIAÇÃO EM LOTE DE NOTAS ANTIGAS (FASE 1) -->
+    <div id="modalConciliacaoClientes" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm hidden z-[85] flex items-center justify-center p-4 no-print">
+        <div class="bg-slate-800 w-full max-w-3xl rounded-3xl border border-slate-700 shadow-2xl p-6 flex flex-col max-h-[92vh]">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-4 mb-3">
+                <div>
+                    <h3 class="font-bold text-xl text-white flex items-center gap-2">
+                        <span>🔄</span> Conciliação de Notas Antigas
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-1">Vincula notas a prazo legadas aos seus respectivos cadastros de clientes em lote.</p>
+                </div>
+                <button type="button" onclick="fecharModalConciliacaoClientes()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white px-3 py-1.5 rounded-xl text-xs font-bold transition">✕ Fechar</button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto custom-scrollbar bg-slate-900/40 rounded-2xl border border-slate-700/60 p-2 mb-4">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-900/80 text-[10px] uppercase font-bold text-slate-400 sticky top-0">
+                        <tr>
+                            <th class="p-3">Nome na Nota</th>
+                            <th>Documento</th>
+                            <th class="text-center">Quantidade</th>
+                            <th class="text-right">Soma Valor</th>
+                            <th>Ação Sugerida</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelaCorpoConciliacaoClientes" class="divide-y divide-slate-800"></tbody>
+                </table>
+            </div>
+
+            <div class="flex justify-between items-center pt-3 border-t border-slate-700">
+                <span class="text-xs text-slate-400">🛡️ Operação atômica e não-destrutiva via Firebase update.</span>
+                <div class="flex gap-2">
+                    <button type="button" onclick="fecharModalConciliacaoClientes()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl text-xs font-bold text-white transition">Cancelar</button>
+                    <button type="button" id="btnExecutarConciliacaoClientes" onclick="executarConciliacaoClientesConfirmada()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/30 transition">VINCULAR NOTAS EM LOTE</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE CONFIGURAÇÕES DA EMPRESA E PIX (FASE 3) -->
+    <div id="modalConfiguracoesEmpresa" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm hidden z-[85] flex items-center justify-center p-4 no-print">
+        <div class="bg-slate-800 w-full max-w-2xl rounded-3xl border border-slate-700 shadow-2xl p-6 flex flex-col max-h-[90vh] overflow-hidden">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-4 mb-4 shrink-0">
+                <div>
+                    <h3 class="font-bold text-xl text-white flex items-center gap-2">
+                        <span>⚙️</span> Configurações da Empresa & PIX
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Parâmetros oficiais impressos em notas, recibos, extratos e relatórios.</p>
+                </div>
+                <button type="button" onclick="fecharModalConfiguracoesEmpresa()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white px-3 py-1.5 rounded-xl text-xs font-bold transition">✕ Fechar</button>
+            </div>
+
+            <form id="formConfiguracoesEmpresa" onsubmit="event.preventDefault(); salvarConfiguracoesEmpresaModal();" class="flex-1 flex flex-col min-h-0 overflow-hidden">
+                <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+                    <!-- SEÇÃO 1: IDENTIFICAÇÃO DA EMPRESA -->
+                    <div class="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/60 space-y-3">
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
+                            <span>🏢</span> Dados Empresariais Oficiais
+                        </h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Nome Fantasia *</label>
+                                <input type="text" id="configNomeFantasia" required placeholder="TUCANO AUTO PEÇAS" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-xs text-white font-bold outline-none focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Razão Social</label>
+                                <input type="text" id="configRazaoSocial" placeholder="Tucano Auto Peças Ltda" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-xs text-white outline-none focus:border-indigo-500">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Subtítulo do Cabeçalho</label>
+                            <input type="text" id="configSubtitulo" placeholder="Comércio de Peças e Acessórios Automotivos" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-xs text-white outline-none focus:border-indigo-500">
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">CNPJ da Empresa</label>
+                                <input type="text" id="configCnpj" oninput="this.value = formatarCpfCnpjEmTempoReal(this.value)" placeholder="00.000.000/0001-00 (Opcional)" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-xs text-white outline-none focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Inscrição Estadual</label>
+                                <input type="text" id="configInscricaoEstadual" placeholder="Isento ou Nº Estadual" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-xs text-white outline-none focus:border-indigo-500">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Telefone Fixo</label>
+                                <input type="text" id="configTelefone" oninput="this.value = formatarTelefoneEmTempoReal(this.value, true)" placeholder="(00) 0000-0000" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-xs text-white outline-none focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">WhatsApp da Loja (Cobrança)</label>
+                                <input type="text" id="configWhatsappLoja" oninput="this.value = formatarTelefoneEmTempoReal(this.value)" placeholder="(00) 90000-0000" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-xs text-white outline-none focus:border-indigo-500">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div class="md:col-span-2">
+                                <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Endereço Completo</label>
+                                <input type="text" id="configEndereco" placeholder="Rua / Av., Número - Bairro" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-xs text-white outline-none focus:border-indigo-500">
+                            </div>
+                            <div class="md:col-span-1">
+                                <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Cidade - UF</label>
+                                <input type="text" id="configCidadeUf" placeholder="Nova Friburgo - RJ" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-xs text-white outline-none focus:border-indigo-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SEÇÃO 2: DADOS PARA RECEBIMENTO VIA PIX -->
+                    <div class="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/60 space-y-3">
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                            <span>💵</span> Dados para Recebimento via PIX
+                        </h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div class="md:col-span-1">
+                                <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Tipo de Chave</label>
+                                <select id="configTipoChavePix" class="w-full bg-slate-900 text-white border border-slate-700 p-2.5 rounded-xl text-xs outline-none focus:border-indigo-500">
+                                    <option value="CNPJ" class="bg-slate-900 text-white">CNPJ</option>
+                                    <option value="Celular" class="bg-slate-900 text-white">Celular</option>
+                                    <option value="E-mail" class="bg-slate-900 text-white">E-mail</option>
+                                    <option value="Chave Aleatória" class="bg-slate-900 text-white">Chave Aleatória</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Chave PIX da Loja</label>
+                                <input type="text" id="configChavePix" placeholder="Chave para impressões com saldo devedor" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-xs text-white font-mono outline-none focus:border-indigo-500">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Titular / Beneficiário do PIX</label>
+                            <input type="text" id="configTitularPix" placeholder="Tucano Auto Peças Ltda" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-xs text-white outline-none focus:border-indigo-500">
+                        </div>
+                    </div>
+
+                    <!-- SEÇÃO 3: PARÂMETROS DE COBRANÇA E DOCUMENTOS -->
+                    <div class="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/60 space-y-3">
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                            <span>⏱️</span> Parâmetros de Alerta e Documentos
+                        </h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div>
+                                <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Alerta Vencendo (Dias)</label>
+                                <input type="number" id="configDiasAlerta" min="1" max="30" value="3" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-xs text-white outline-none focus:border-indigo-500">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Mensagem de Rodapé dos Documentos</label>
+                                <input type="text" id="configRodapeDoc" placeholder="Obrigado pela preferência e parceria!" class="w-full bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-xs text-white outline-none focus:border-indigo-500">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RODAPÉ FIXO SEMPRE VISÍVEL -->
+                <div class="flex justify-between items-center pt-3 border-t border-slate-700 mt-2 bg-slate-800 shrink-0">
+                    <span class="text-xs text-slate-400">🛡️ Sincronização em tempo real com todos os dispositivos.</span>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="fecharModalConfiguracoesEmpresa()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2.5 rounded-xl text-xs font-bold text-white transition">Cancelar</button>
+                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/30 transition flex items-center gap-1.5">💾 SALVAR CONFIGURAÇÕES & PIX</button>
+                    </div>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -623,6 +1315,14 @@
 
     <!-- CARREGAMENTO SEGURO DE CONFIGURAÇÃO (LOCAL / PRODUÇÃO) -->
     <script src="firebase-config.js"></script>
+    <script src="js/nucleo-financeiro.js"></script>
+    <script src="js/clientes.js"></script>
+    <script src="js/relatorios.js"></script>
+    <script src="js/configuracoes.js"></script>
+    <script src="js/impressao.js"></script>
+    <script src="js/whatsapp.js"></script>
+    <script src="js/backup-v3.js"></script>
+    <script src="js/seguranca.js"></script>
 
     <script>
         // ==========================================
@@ -693,7 +1393,7 @@
         function verificarSeVencido(vale) {
             const dataVal = vale.dataValidade || vale.validade;
             if (!dataVal) return false;
-            const hojeStr = new Date().toISOString().split('T')[0];
+            const hojeStr = obterDataLocalISO();
             return dataVal < hojeStr;
         }
 
@@ -702,6 +1402,9 @@
         // ==========================================
         database.ref('.info/connected').on('value', (snap) => {
             const isConnected = snap.val() === true;
+            if (typeof atualizarEstadoConexaoNucleo === 'function') {
+                atualizarEstadoConexaoNucleo(isConnected);
+            }
             const bolinha = document.getElementById('bolinhaStatus');
             const texto = document.getElementById('textoStatus');
             if (bolinha && texto) {
@@ -721,6 +1424,9 @@
         // 4. SISTEMA DE PRIVILÉGIOS (LOCALSTORAGE)
         // ==========================================
         async function validarSenhaMaster() {
+            if (typeof validarSenhaMasterSincronizada === 'function') {
+                return await validarSenhaMasterSincronizada();
+            }
             // Lê do LocalStorage do Tauri. Se não existir, usa '1234' como padrão.
             const senhaSalva = localStorage.getItem('senhaMasterTucano') || '1234';
             
@@ -787,6 +1493,8 @@
                     listaGlobalNotasPrazo = Object.values(notasPrazoMap);
                     atualizarTabelaNotasPrazo();
                     atualizarDashboardNotasPrazo();
+                    if (typeof atualizarBadgeNotasSemVinculo === 'function') atualizarBadgeNotasSemVinculo();
+                    if (typeof subAbaNotasAtiva !== 'undefined' && subAbaNotasAtiva === 'clientes' && typeof atualizarTabelaCarteiraClientes === 'function') atualizarTabelaCarteiraClientes();
                 });
 
                 notasPrazoRefGlobal.on('child_changed', (snap) => {
@@ -794,6 +1502,8 @@
                     listaGlobalNotasPrazo = Object.values(notasPrazoMap);
                     atualizarTabelaNotasPrazo();
                     atualizarDashboardNotasPrazo();
+                    if (typeof atualizarBadgeNotasSemVinculo === 'function') atualizarBadgeNotasSemVinculo();
+                    if (typeof subAbaNotasAtiva !== 'undefined' && subAbaNotasAtiva === 'clientes' && typeof atualizarTabelaCarteiraClientes === 'function') atualizarTabelaCarteiraClientes();
                     if (!document.getElementById('modalExtratoNotaPrazo').classList.contains('hidden')) {
                         const idAberto = document.getElementById('extratoNotaNumeroControle')?.dataset?.notaId;
                         if (idAberto === snap.key) {
@@ -807,13 +1517,41 @@
                     listaGlobalNotasPrazo = Object.values(notasPrazoMap);
                     atualizarTabelaNotasPrazo();
                     atualizarDashboardNotasPrazo();
+                    if (typeof atualizarBadgeNotasSemVinculo === 'function') atualizarBadgeNotasSemVinculo();
+                    if (typeof subAbaNotasAtiva !== 'undefined' && subAbaNotasAtiva === 'clientes' && typeof atualizarTabelaCarteiraClientes === 'function') atualizarTabelaCarteiraClientes();
                 });
+
+                // 3. LISTENER DE CLIENTES E CARTEIRA (FASE 1)
+                if (typeof iniciarListenerClientes === 'function') {
+                    iniciarListenerClientes();
+                }
+
+                // 4. LISTENER DE CONFIGURAÇÕES DA EMPRESA E PIX (FASE 3)
+                if (typeof iniciarListenerConfiguracoesEmpresa === 'function') {
+                    iniciarListenerConfiguracoesEmpresa();
+                }
+
+                // 5. LISTENER DE SEGURANÇA E SENHA MASTER (FASE 4)
+                if (typeof iniciarListenerSeguranca === 'function') {
+                    iniciarListenerSeguranca();
+                }
                 
             } else {
                 document.getElementById('telaLogin').classList.remove('hidden');
                 document.getElementById('conteudoSistema').classList.add('hidden');
                 if (valesRefGlobal) { valesRefGlobal.off(); valesRefGlobal = null; }
                 if (notasPrazoRefGlobal) { notasPrazoRefGlobal.off(); notasPrazoRefGlobal = null; }
+                if (typeof encerrarListenerClientes === 'function') {
+                    encerrarListenerClientes();
+                }
+                if (typeof encerrarListenerConfiguracoesEmpresa === 'function') {
+                    encerrarListenerConfiguracoesEmpresa();
+                }
+                if (typeof encerrarListenerSeguranca === 'function') {
+                    encerrarListenerSeguranca();
+                }
+                valesMap = {};
+                listaGlobalVales = [];
                 notasPrazoMap = {};
                 listaGlobalNotasPrazo = [];
             }
@@ -828,15 +1566,20 @@
         const mBaixa = IMask(document.getElementById('campoValorBaixa'), { mask: 'R$ num', blocks: { num: { mask: Number, thousandsSeparator: '.', padFractionalZeros: true, radix: ',', mapToRadix: ['.'] } } });
         const mNotaValorOriginal = IMask(document.getElementById('campoNotaValorOriginal'), { mask: 'R$ num', blocks: { num: { mask: Number, thousandsSeparator: '.', padFractionalZeros: true, radix: ',', mapToRadix: ['.'] } } });
         const mNotaBaixaValor = IMask(document.getElementById('campoBaixaNotaValor'), { mask: 'R$ num', blocks: { num: { mask: Number, thousandsSeparator: '.', padFractionalZeros: true, radix: ',', mapToRadix: ['.'] } } });
+        if (document.getElementById('campoClienteLimiteCredito')) {
+            IMask(document.getElementById('campoClienteLimiteCredito'), { mask: 'R$ num', blocks: { num: { mask: Number, thousandsSeparator: '.', padFractionalZeros: true, radix: ',', mapToRadix: ['.'] } } });
+        }
 
         function toF(t) { return parseFloat(t.replace('R$', '').replace(/\./g, '').replace(',', '.')) || 0; }
         function fD(d) { if(!d) return '-'; const [y,m,d_] = d.split('-'); return `${d_}/${m}/${y}`; }
 
         function calcularSaldoRestante(vale) {
+            if (!vale) return 0;
             const baixas = vale.baixas ? Object.values(vale.baixas) : [];
-            const totalUso = baixas.reduce((acc, item) => acc + (parseFloat(item.valorUsado) || 0), 0);
-            const valorBase = parseFloat(vale.valorOriginal) || parseFloat(vale.valor) || 0;
-            return Math.max(0, valorBase - totalUso);
+            const totalUsoCentavos = baixas.reduce((acc, item) => acc + moedaParaCentavos(item ? item.valorUsado : 0), 0);
+            const valorBaseCentavos = moedaParaCentavos(vale.valorOriginal || vale.valor || 0);
+            const saldoCentavos = Math.max(0, valorBaseCentavos - totalUsoCentavos);
+            return centavosParaReais(saldoCentavos);
         }
 
         // ==========================================
@@ -845,13 +1588,22 @@
         document.getElementById('formCadastroVale').addEventListener('submit', async function(e) {
             e.preventDefault();
 
+            if (typeof garantirConexaoParaOperacaoFinanceira === 'function' && !garantirConexaoParaOperacaoFinanceira('Cadastro de Vale')) {
+                return;
+            }
+
             const btnSubmit = document.getElementById('btnSalvarVale');
             if (btnSubmit.disabled) return;
             const textoOriginal = btnSubmit.innerHTML;
             btnSubmit.disabled = true;
             btnSubmit.innerHTML = 'Processando...';
 
-            const id = Date.now().toString().slice(-6);
+            let id = Date.now().toString().slice(-6);
+            let tentativas = 0;
+            while ((valesMap[id] || (Array.isArray(listaGlobalVales) && listaGlobalVales.some(x => String(x.id) === String(id)))) && tentativas < 100) {
+                tentativas++;
+                id = String(parseInt(id, 10) + 1).slice(-6).padStart(6, '0');
+            }
             const dados = {
                 id,
                 dataEmissao: document.getElementById('campoDataEmissao').value,
@@ -888,6 +1640,10 @@
         }
 
         async function confirmarProcessoDeBaixa() {
+            if (typeof garantirConexaoParaOperacaoFinanceira === 'function' && !garantirConexaoParaOperacaoFinanceira('Baixa de Vale')) {
+                return;
+            }
+
             const id = document.getElementById('idValeSendoBaixado').value;
             const vUso = toF(mBaixa.value);
             const nota = document.getElementById('campoNotaVendaBaixa').value.trim();
@@ -909,7 +1665,7 @@
 
             try {
                 await database.ref(`vales/${id}/baixas`).push({ 
-                    dataBaixa: new Date().toISOString().split('T')[0], 
+                    dataBaixa: obterDataLocalISO(), 
                     valorUsado: vUso, 
                     notaVenda: nota 
                 });
@@ -1219,7 +1975,7 @@
             const link = document.createElement('a');
             const url = URL.createObjectURL(blob);
             link.href = url;
-            link.download = `VALES_TUCANO_CONTABILIDADE_${new Date().toISOString().split('T')[0]}.csv`;
+            link.download = `VALES_TUCANO_CONTABILIDADE_${obterDataLocalISO()}.csv`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -1230,6 +1986,9 @@
         // 11. EXPORTAÇÃO JSON, IMPORTAÇÃO E IMPRESSÃO
         // ==========================================
         async function gerarBackupDadosJSON() {
+            if (typeof executarExportacaoBackupV3 === 'function') {
+                return await executarExportacaoBackupV3();
+            }
             if (await validarSenhaMaster()) {
                 const payload = {
                     schemaVersion: 2,
@@ -1241,7 +2000,7 @@
                 const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
-                link.download = `BACKUP_TUCANO_COMPLETO_${new Date().toISOString().split('T')[0]}.json`;
+                link.download = `BACKUP_TUCANO_COMPLETO_${obterDataLocalISO()}.json`;
                 link.click();
             } else {
                 Swal.fire('Erro', 'Senha incorreta.', 'error');
@@ -1249,6 +2008,9 @@
         }
 
         async function importarDadosJSON(e) {
+            if (typeof executarImportacaoBackupV3 === 'function') {
+                return await executarImportacaoBackupV3(e);
+            }
             const inputArquivo = e.target;
             const arquivo = inputArquivo.files && inputArquivo.files[0];
             if (!arquivo) return;
@@ -1544,9 +2306,12 @@
         }
 
         // ==========================================
-        // 12. CONTROLE DE SENHA MASTER LOCAL
+        // 12. CONTROLE DE SENHA MASTER LOCAL E SINCRONIZADA
         // ==========================================
         async function alterarSenhaMaster() {
+            if (typeof alterarSenhaMasterSincronizada === 'function') {
+                return await alterarSenhaMasterSincronizada();
+            }
             const novaSenha = document.getElementById('campoNovaSenhaMaster').value.trim();
             
             if (!novaSenha) {
@@ -1565,10 +2330,9 @@
         function fecharModalBaixa() { document.getElementById('modalRealizarBaixa').classList.add('hidden'); }
         
         function resetDatas() { 
-            document.getElementById('campoDataEmissao').valueAsDate = new Date(); 
-            const val = new Date(); 
-            val.setMonth(val.getMonth() + 3); 
-            document.getElementById('campoDataValidade').valueAsDate = val; 
+            const hojeISO = obterDataLocalISO();
+            document.getElementById('campoDataEmissao').value = hojeISO;
+            document.getElementById('campoDataValidade').value = adicionarMesesDataLocalISO(hojeISO, 3);
         }
 
         // =========================================================================
@@ -1626,7 +2390,7 @@
             const cPrazo = document.getElementById('campoNotaPrazoDias');
             const cVencimento = document.getElementById('campoNotaDataVencimento');
             if (cEmissao && cPrazo && cVencimento) {
-                cEmissao.valueAsDate = new Date();
+                cEmissao.value = obterDataLocalISO();
                 cPrazo.value = 30;
                 cVencimento.value = calcularDataVencimento(cEmissao.value, 30);
             }
@@ -1719,7 +2483,7 @@
         // Status Financeiro: ABERTA / PARCIAL / QUITADA / CANCELADA
         // Indicador de Cobrança: NORMAL / VENCENDO / VENCIDA
         // Prioridade: CANCELADA > QUITADA > Indicador de Cobrança (para saldo > 0)
-        function calcularSituacaoNota(nota, dataReferencia = new Date()) {
+        function calcularSituacaoNota(nota, dataReferencia) {
             if (!nota) {
                 return {
                     saldo: 0,
@@ -1730,11 +2494,14 @@
                 };
             }
 
-            const valorOrig = parseFloat(nota.valorOriginal) || 0;
+            const valorOrigCentavos = moedaParaCentavos(nota.valorOriginal);
+            const valorOrig = centavosParaReais(valorOrigCentavos);
             const pagamentos = extrairPagamentosNota(nota);
             const pagamentosAtivos = pagamentos.filter(p => p && p.status !== 'ESTORNADO');
-            const totalRecebido = Math.round(pagamentosAtivos.reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0) * 100) / 100;
-            const saldo = Math.max(0, Math.round((valorOrig - totalRecebido) * 100) / 100);
+            const totalRecebidoCentavos = pagamentosAtivos.reduce((sum, p) => sum + moedaParaCentavos(p ? p.valor : 0), 0);
+            const totalRecebido = centavosParaReais(totalRecebidoCentavos);
+            const saldoCentavos = Math.max(0, valorOrigCentavos - totalRecebidoCentavos);
+            const saldo = centavosParaReais(saldoCentavos);
 
             // 1. CANCELADA tem prioridade máxima
             if (nota.status === 'CANCELADA' || nota.statusCancelamento === 'CANCELADA') {
@@ -1748,7 +2515,7 @@
             }
 
             // 2. QUITADA tem prioridade sobre vencimento
-            if (saldo <= 0.001 && valorOrig > 0) {
+            if (saldoCentavos === 0 && valorOrigCentavos > 0) {
                 return {
                     saldo: 0,
                     totalRecebido: totalRecebido,
@@ -1759,24 +2526,18 @@
             }
 
             // 3. Status Financeiro Principal
-            const statusFinanceiro = (totalRecebido > 0) ? 'PARCIAL' : 'ABERTA';
+            const statusFinanceiro = (totalRecebidoCentavos > 0) ? 'PARCIAL' : 'ABERTA';
 
             // 4. Indicador de Cobrança (para notas com saldo)
             let indicadorCobranca = 'NORMAL';
             const vencimentoStr = nota.dataVencimento || '';
             if (vencimentoStr) {
-                const refStr = typeof dataReferencia === 'string'
-                    ? dataReferencia.split('T')[0]
-                    : (dataReferencia instanceof Date ? dataReferencia.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+                const refStr = obterDataLocalISO(dataReferencia);
 
                 if (vencimentoStr < refStr) {
                     indicadorCobranca = 'VENCIDA';
                 } else {
-                    const [aV, mV, dV] = vencimentoStr.split('-').map(Number);
-                    const [aR, mR, dR] = refStr.split('-').map(Number);
-                    const dtV = new Date(aV, mV - 1, dV);
-                    const dtR = new Date(aR, mR - 1, dR);
-                    const diffDias = Math.ceil((dtV - dtR) / (1000 * 60 * 60 * 24));
+                    const diffDias = calcularDiferencaDiasISO(vencimentoStr, refStr);
                     if (diffDias >= 0 && diffDias <= 3) {
                         indicadorCobranca = 'VENCENDO';
                     }
@@ -1815,6 +2576,10 @@
         document.getElementById('formCadastroNotaPrazo').addEventListener('submit', async function(e) {
             e.preventDefault();
 
+            if (typeof garantirConexaoParaOperacaoFinanceira === 'function' && !garantirConexaoParaOperacaoFinanceira('Cadastro de Nota a Prazo')) {
+                return;
+            }
+
             const btnSubmit = document.getElementById('btnSalvarNotaPrazo');
             if (btnSubmit.disabled) return;
             const textoOriginal = btnSubmit.innerHTML;
@@ -1833,6 +2598,82 @@
             const prazoDias = parseInt(document.getElementById('campoNotaPrazoDias').value, 10) || 30;
             const dataVencimento = document.getElementById('campoNotaDataVencimento').value || calcularDataVencimento(dataEmissao, prazoDias);
 
+            const nomeClienteDigitado = document.getElementById('campoNotaCliente').value.trim();
+            const clienteIdForm = document.getElementById('campoNotaClienteId')?.value || '';
+            let clienteVinculado = clienteIdForm ? clientesMap[clienteIdForm] : null;
+
+            if (!clienteVinculado && nomeClienteDigitado) {
+                const normNome = normalizarNomeCliente(nomeClienteDigitado);
+                clienteVinculado = listaGlobalClientes.find(c => normalizarNomeCliente(c.nome) === normNome);
+            }
+
+            if (clienteVinculado && clienteVinculado.limiteCredito > 0) {
+                const resumoCli = calcularResumoCarteiraCliente(clienteVinculado, listaGlobalNotasPrazo);
+                const saldoAtualCent = moedaParaCentavos(resumoCli.saldoDevedor);
+                const valorNotaCent = moedaParaCentavos(valorOrig);
+                const limiteCent = moedaParaCentavos(clienteVinculado.limiteCredito);
+
+                if (saldoAtualCent + valorNotaCent > limiteCent) {
+                    const novoSaldoFmt = formatadorMoeda.format(centavosParaReais(saldoAtualCent + valorNotaCent));
+                    const limiteFmt = formatadorMoeda.format(clienteVinculado.limiteCredito);
+                    const saldoAtualFmt = formatadorMoeda.format(resumoCli.saldoDevedor);
+
+                    const confirmacaoLimite = await Swal.fire({
+                        icon: 'warning',
+                        title: 'Limite de Crédito Excedido',
+                        html: `O cliente <b>${escapeHtml(clienteVinculado.nome)}</b> possui limite de <b>${limiteFmt}</b>.<br><br>` +
+                              `• Saldo Devedor Atual: <b>${saldoAtualFmt}</b><br>` +
+                              `• Nova Nota a Emitir: <b>${formatadorMoeda.format(valorOrig)}</b><br>` +
+                              `• Novo Saldo Projetado: <b class="text-rose-400">${novoSaldoFmt}</b><br><br>` +
+                              `Deseja autorizar a emissão desta nota a prazo mesmo com o limite excedido?`,
+                        showCancelButton: true,
+                        confirmButtonText: 'Autorizar Emissão',
+                        cancelButtonText: 'Cancelar',
+                        confirmButtonColor: '#e11d48',
+                        cancelButtonColor: '#475569'
+                    });
+
+                    if (!confirmacaoLimite.isConfirmed) {
+                        btnSubmit.disabled = false;
+                        btnSubmit.innerHTML = textoOriginal;
+                        return;
+                    }
+                }
+            }
+
+            const cpfCnpjRaw = (document.getElementById('campoNotaCpfCnpj')?.value || '').trim();
+            const telRaw = (document.getElementById('campoNotaTelefone')?.value || '').trim();
+
+            let docFormatado = '';
+            if (cpfCnpjRaw) {
+                const validDoc = typeof validarEFormatarCpfCnpj === 'function' ? validarEFormatarCpfCnpj(cpfCnpjRaw) : { valido: true, formatado: cpfCnpjRaw };
+                if (!validDoc.valido) {
+                    Swal.fire('CPF / CNPJ Inválido', validDoc.erro || 'O CPF deve possuir exatamente 11 dígitos ou o CNPJ exatamente 14 dígitos.', 'warning');
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerHTML = textoOriginal;
+                    return;
+                }
+                docFormatado = validDoc.formatado || cpfCnpjRaw;
+            }
+
+            let telFormatado = '';
+            if (telRaw) {
+                const validTel = typeof normalizarTelefoneCliente === 'function' ? normalizarTelefoneCliente(telRaw) : { valido: true, limpo: telRaw.replace(/\D/g, '') };
+                if (!validTel.valido) {
+                    Swal.fire('Telefone / WhatsApp Inválido', validTel.erro || 'Telefone inválido.', 'warning');
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerHTML = textoOriginal;
+                    return;
+                }
+                if (!validTel.opcionalVazio && validTel.limpo.length !== 11) {
+                    Swal.fire('Telefone / WhatsApp Inválido', 'O WhatsApp/Celular da nota deve possuir obrigatoriamente 11 dígitos (DDD de 11 a 99 + 9 dígitos). Ex: (22) 99999-9999.', 'warning');
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerHTML = textoOriginal;
+                    return;
+                }
+                telFormatado = validTel.formatado || telRaw;
+            }
+
             const novaRef = database.ref('notasPrazo').push();
             const idTecnico = novaRef.key;
             const numeroControle = await gerarNumeroControleNotaUnico();
@@ -1842,9 +2683,10 @@
                 id: idTecnico,
                 numeroControle: numeroControle,
                 tipo: 'NOTA_A_PRAZO',
-                cliente: document.getElementById('campoNotaCliente').value.trim(),
-                cpfCnpj: document.getElementById('campoNotaCpfCnpj').value.trim(),
-                telefone: document.getElementById('campoNotaTelefone').value.trim(),
+                clienteId: clienteVinculado ? clienteVinculado.id : null,
+                cliente: nomeClienteDigitado,
+                cpfCnpj: docFormatado,
+                telefone: telFormatado,
                 numeroPedido: document.getElementById('campoNotaNumeroPedido').value.trim(),
                 numeroDocumento: document.getElementById('campoNotaNumeroDocumento').value.trim(),
                 dataEmissao: dataEmissao,
@@ -1863,6 +2705,16 @@
             try {
                 await novaRef.set(dadosNota);
                 this.reset();
+                if (document.getElementById('campoNotaClienteId')) {
+                    document.getElementById('campoNotaClienteId').value = '';
+                }
+                const selClienteNota = document.getElementById('selectClienteCadastradoNota');
+                if (selClienteNota) selClienteNota.value = '';
+                const boxResumo = document.getElementById('boxResumoClienteNota');
+                if (boxResumo) boxResumo.classList.add('hidden');
+                if (typeof definirPrazoRapidoNota === 'function') {
+                    definirPrazoRapidoNota(30);
+                }
                 resetDatasNotaPrazo();
                 const escolha = await Swal.fire({
                     title: 'Nota Salva com Sucesso!',
@@ -1909,7 +2761,7 @@
             let totalCancelado = 0;
             let totalEmitidoLiquido = 0;
 
-            const hojeStr = new Date().toISOString().split('T')[0];
+            const hojeStr = obterDataLocalISO();
 
             listaGlobalNotasPrazo.forEach(nota => {
                 const sit = calcularSituacaoNota(nota);
@@ -2022,7 +2874,7 @@
             if (!corpo) return;
             corpo.innerHTML = '';
 
-            const hojeStr = new Date().toISOString().split('T')[0];
+            const hojeStr = obterDataLocalISO();
 
             const filtradas = listaGlobalNotasPrazo.filter(nota => {
                 const sit = calcularSituacaoNota(nota);
@@ -2086,7 +2938,7 @@
                 const pagtos = extrairPagamentosNota(nota).filter(p => p && p.status !== 'ESTORNADO');
                 const temPagto = pagtos.length > 0;
                 const podeBaixar = sit.saldo > 0 && sit.statusFinanceiro !== 'CANCELADA';
-                const podeCancelar = sit.statusFinanceiro !== 'CANCELADA' && sit.statusFinanceiro !== 'QUITADA';
+                const podeCancelar = sit.statusFinanceiro !== 'CANCELADA' && sit.statusFinanceiro !== 'QUITADA' && !temPagto;
 
                 corpo.innerHTML += `
                     <tr class="border-b border-slate-700/30 hover:bg-slate-800/50 transition">
@@ -2112,10 +2964,11 @@
                         </td>
                         <td>${badgeHtml}</td>
                         <td class="p-3.5 text-right space-x-1 whitespace-nowrap">
+                            ${podeBaixar ? `<button onclick="abrirModalBaixaNota('${escapeHtml(nota.id)}')" class="bg-emerald-600 hover:bg-emerald-500 px-2.5 py-1 rounded text-xs font-bold text-white transition shadow inline-flex items-center gap-1" title="Registrar Pagamento / Baixar Nota">💵 Baixar</button>` : ''}
+                            <button onclick="imprimirReciboOuComprovanteVendaLinha('${escapeHtml(nota.id)}')" class="bg-indigo-600 hover:bg-indigo-500 px-2.5 py-1 rounded text-xs font-bold text-white transition shadow inline-flex items-center gap-1" title="Imprimir Recibo de Pagamento desta Venda">🧾 Recibo</button>
+                            <button onclick="imprimirNotaPrazoA4('${escapeHtml(nota.id)}')" class="bg-slate-700 hover:bg-slate-600 px-2.5 py-1 rounded text-xs font-bold text-white transition shadow inline-flex items-center gap-1" title="Imprimir Nota em A4">🖨️ Nota</button>
                             <button onclick="abrirModalExtratoNota('${escapeHtml(nota.id)}')" title="Ver Extrato e Histórico" class="p-1.5 rounded hover:bg-slate-700 text-sm transition" aria-label="Extrato">📋</button>
-                            <button onclick="imprimirNotaPrazoA4('${escapeHtml(nota.id)}')" title="Imprimir Nota em A4" class="p-1.5 rounded hover:bg-slate-700 text-sm transition" aria-label="Imprimir Nota">🖨️</button>
-                            ${temPagto ? `<button onclick="imprimirUltimoReciboNota('${escapeHtml(nota.id)}')" title="Imprimir Último Recibo A4" class="p-1.5 rounded hover:bg-slate-700 text-sm transition" aria-label="Último Recibo">🧾</button>` : ''}
-                            ${podeBaixar ? `<button onclick="abrirModalBaixaNota('${escapeHtml(nota.id)}')" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1 rounded text-xs font-bold text-white transition shadow">BAIXAR</button>` : ''}
+                            <button onclick="enviarWhatsAppNota('${escapeHtml(nota.id)}')" title="Enviar Cobrança / Lembrete / Recibo no WhatsApp" class="p-1.5 rounded hover:bg-emerald-900/50 text-emerald-400 text-sm transition" aria-label="WhatsApp">📲</button>
                             ${podeCancelar ? `<button onclick="solicitarCancelamentoNota('${escapeHtml(nota.id)}')" title="Cancelar Nota" class="p-1.5 rounded hover:bg-red-900/50 text-red-400 text-sm transition" aria-label="Cancelar">🚫</button>` : ''}
                         </td>
                     </tr>
@@ -2150,7 +3003,7 @@
             document.getElementById('textoNotaBaixaSaldoAtual').innerText = formatadorMoeda.format(sit.saldo);
 
             mNotaBaixaValor.value = sit.saldo.toFixed(2).replace('.', ',');
-            document.getElementById('campoBaixaNotaData').valueAsDate = new Date();
+            document.getElementById('campoBaixaNotaData').value = obterDataLocalISO();
             document.getElementById('campoBaixaNotaForma').value = 'Dinheiro';
             document.getElementById('campoBaixaNotaObs').value = '';
 
@@ -2165,6 +3018,10 @@
         // BAIXA CONCORRENTE BLINDADA COM TRANSAÇÃO FIREBASE E IDEMPOTÊNCIA
         // =========================================================================
         async function confirmarProcessoDeBaixaNota() {
+            if (typeof garantirConexaoParaOperacaoFinanceira === 'function' && !garantirConexaoParaOperacaoFinanceira('Baixa de Nota a Prazo')) {
+                return;
+            }
+
             const id = document.getElementById('idNotaPrazoSendoBaixada').value;
             const nota = listaGlobalNotasPrazo.find(x => String(x.id) === String(id));
             if (!nota) {
@@ -2349,6 +3206,17 @@
                 }
 
                 if (!resultadoTransacao.committed) {
+                    if (numeroRecibo) {
+                        try {
+                            database.ref('sequencias/recibosInutilizados').push({
+                                numeroRecibo: numeroRecibo,
+                                idNota: id,
+                                motivo: motivoRejeicao ? motivoRejeicao.tipo : 'TRANSACAO_NAO_EFETIVADA',
+                                data: new Date().toISOString(),
+                                operador: operadorAtual
+                            });
+                        } catch (eInut) {}
+                    }
                     if (motivoRejeicao) {
                         if (motivoRejeicao.tipo === 'CANCELADA') {
                             Swal.fire('Bloqueado', 'Esta nota foi cancelada por outro usuário.', 'error');
@@ -2398,8 +3266,32 @@
         }
 
         async function solicitarCancelamentoNota(id) {
+            if (typeof garantirConexaoParaOperacaoFinanceira === 'function' && !garantirConexaoParaOperacaoFinanceira('Cancelamento de Nota')) {
+                return;
+            }
+
             const nota = listaGlobalNotasPrazo.find(x => String(x.id) === String(id));
             if (!nota) return;
+
+            const sitPrevia = calcularSituacaoNota(nota);
+            if (sitPrevia.statusFinanceiro === 'CANCELADA') {
+                Swal.fire('Aviso', 'Esta nota já está cancelada.', 'info');
+                return;
+            }
+            if (sitPrevia.statusFinanceiro === 'QUITADA') {
+                Swal.fire('Bloqueado', 'Esta nota já foi totalmente quitada e não pode ser cancelada diretamente. Estorne os pagamentos antes se necessário.', 'warning');
+                return;
+            }
+            const pagtosAtivosPrevios = extrairPagamentosNota(nota).filter(p => p && p.status !== 'ESTORNADO');
+            if (pagtosAtivosPrevios.length > 0 || sitPrevia.totalRecebido > 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Operação Bloqueada',
+                    html: `Esta nota possui <b>${pagtosAtivosPrevios.length} pagamento(s) ativo(s)</b> (Total recebido: ${formatadorMoeda.format(sitPrevia.totalRecebido)}).<br><br>Para cancelar uma nota a prazo, é obrigatório <b>estornar todos os pagamentos ativos</b> previamente no extrato.`,
+                    confirmButtonText: 'Entendido'
+                });
+                return;
+            }
 
             if (!await validarSenhaMaster()) {
                 Swal.fire('Bloqueado', 'Senha mestre incorreta. Operação cancelada.', 'error');
@@ -2437,10 +3329,15 @@
                             return; // aborta transação
                         }
 
-                        // Verificação de segurança: nota totalmente quitada não deve ser cancelada diretamente
+                        // Verificação de segurança: não cancelar se possuir pagamentos ativos
                         const sit = calcularSituacaoNota(notaAtual);
                         if (sit.statusFinanceiro === 'QUITADA') {
                             motivoRejeicao = 'QUITADA';
+                            return; // aborta transação
+                        }
+                        const pagtosAtivosServidor = extrairPagamentosNota(notaAtual).filter(p => p && p.status !== 'ESTORNADO');
+                        if (pagtosAtivosServidor.length > 0 || sit.totalRecebido > 0) {
+                            motivoRejeicao = 'PAGAMENTOS_ATIVOS';
                             return; // aborta transação
                         }
 
@@ -2460,6 +3357,8 @@
                             Swal.fire('Aviso', 'Esta nota já foi cancelada por outro usuário.', 'info');
                         } else if (motivoRejeicao === 'QUITADA') {
                             Swal.fire('Bloqueado', 'Esta nota já foi totalmente quitada e não pode ser cancelada diretamente.', 'warning');
+                        } else if (motivoRejeicao === 'PAGAMENTOS_ATIVOS') {
+                            Swal.fire('Bloqueado', 'Esta nota possui pagamentos ativos registrados no servidor. Estorne os pagamentos antes de cancelar.', 'warning');
                         } else {
                             Swal.fire('Aviso', 'Concorrência detectada durante o cancelamento. Revise os dados e tente novamente.', 'warning');
                         }
@@ -2478,6 +3377,10 @@
         // ESTORNO SEGURO COM RECONCILIAÇÃO DE SALDO E AUDITORIA COMPLETA
         // =========================================================================
         async function solicitarEstornoPagamento(idNota, idPagamento) {
+            if (typeof garantirConexaoParaOperacaoFinanceira === 'function' && !garantirConexaoParaOperacaoFinanceira('Estorno de Pagamento')) {
+                return;
+            }
+
             const nota = listaGlobalNotasPrazo.find(x => String(x.id) === String(idNota));
             if (!nota) return;
 
@@ -2654,6 +3557,7 @@
                             </td>
                             <td class="p-3 text-right space-x-1 whitespace-nowrap">
                                 <button onclick="imprimirReciboPagamentoA4('${escapeHtml(nota.id)}', '${escapeHtml(p.id)}')" title="Imprimir Recibo A4" class="p-1 rounded hover:bg-slate-700 text-xs">🖨️ Recibo</button>
+                                <button onclick="enviarWhatsAppReciboNota('${escapeHtml(nota.id)}', '${escapeHtml(p.id)}')" title="Enviar Recibo no WhatsApp" class="p-1 rounded hover:bg-emerald-900/60 text-emerald-400 text-xs">📲 Zap</button>
                                 ${!estornado && status !== 'CANCELADA' ? `<button onclick="solicitarEstornoPagamento('${escapeHtml(nota.id)}', '${escapeHtml(p.id)}')" title="Estornar Pagamento" class="p-1 rounded hover:bg-red-900/50 text-red-400 text-xs">↩️ Estornar</button>` : ''}
                             </td>
                         </tr>
@@ -2662,6 +3566,10 @@
             }
 
             document.getElementById('btnImprimirNotaA4').onclick = () => imprimirNotaPrazoA4(nota.id);
+            const btnZap = document.getElementById('btnZapPeloExtrato');
+            if (btnZap) {
+                btnZap.onclick = () => enviarWhatsAppNota(nota.id);
+            }
             const btnBaixar = document.getElementById('btnBaixarPeloExtrato');
             if (saldo > 0 && status !== 'CANCELADA') {
                 btnBaixar.classList.remove('hidden');
@@ -2677,6 +3585,14 @@
         function imprimirNotaPrazoA4(id) {
             const nota = listaGlobalNotasPrazo.find(x => String(x.id) === String(id));
             if (!nota) return;
+
+            if (typeof gerarHtmlImpressaoNotaPrazoA4 === 'function' && typeof executarImpressaoHtmlNaAreaFinal === 'function') {
+                const cfg = (typeof obterConfiguracoesEmpresaSegura === 'function') ? obterConfiguracoesEmpresaSegura() : {};
+                const hojeRef = (typeof obterDataLocalISO === 'function') ? obterDataLocalISO() : new Date().toISOString().slice(0, 10);
+                const htmlNota = gerarHtmlImpressaoNotaPrazoA4(nota, cfg, hojeRef);
+                executarImpressaoHtmlNaAreaFinal(htmlNota);
+                return;
+            }
 
             const saldo = calcularSaldoNota(nota);
             const totalPago = calcularTotalPagoNota(nota);
@@ -2795,9 +3711,16 @@
             setTimeout(() => { window.print(); }, 300);
         }
 
-        function imprimirReciboPagamentoA4(idNota, idPagamento) {
+        function imprimirReciboPagamentoA4(idNota, idPagamento, opcoes) {
             const nota = listaGlobalNotasPrazo.find(x => String(x.id) === String(idNota));
             if (!nota) return;
+
+            if (typeof gerarHtmlImpressaoReciboPagamentoA4 === 'function' && typeof executarImpressaoHtmlNaAreaFinal === 'function') {
+                const cfg = (typeof obterConfiguracoesEmpresaSegura === 'function') ? obterConfiguracoesEmpresaSegura() : {};
+                const htmlRecibo = gerarHtmlImpressaoReciboPagamentoA4(nota, idPagamento, opcoes, cfg);
+                executarImpressaoHtmlNaAreaFinal(htmlRecibo);
+                return;
+            }
 
             const pagtos = extrairPagamentosNota(nota);
             const pagto = pagtos.find(p => String(p.id) === String(idPagamento));
@@ -2808,9 +3731,23 @@
 
             const valorOrig = parseFloat(nota.valorOriginal) || 0;
             const valorPago = parseFloat(pagto.valor) || 0;
-            const pagtosAtivosAteAgora = pagtos.filter(p => p.status !== 'ESTORNADO');
-            const totalRecebidoAcumulado = pagtosAtivosAteAgora.reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0);
-            const saldoRestante = Math.max(0, Math.round((valorOrig - totalRecebidoAcumulado) * 100) / 100);
+
+            const idxPagto = pagtos.findIndex(p => String(p.id) === String(idPagamento));
+            const pagtosAteEste = idxPagto !== -1 ? pagtos.slice(0, idxPagto + 1) : pagtos;
+            const pagtosAtivosAteAgora = pagtosAteEste.filter(p => p && p.status !== 'ESTORNADO');
+
+            let totalRecebidoAcumulado = 0;
+            let saldoRestante = 0;
+
+            if (pagto.saldoAnterior !== undefined && pagto.saldoApos !== undefined) {
+                saldoRestante = Math.max(0, parseFloat(pagto.saldoApos) || 0);
+                totalRecebidoAcumulado = Math.max(0, Math.round((valorOrig - saldoRestante) * 100) / 100);
+            } else {
+                totalRecebidoAcumulado = pagtosAtivosAteAgora.reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0);
+                totalRecebidoAcumulado = Math.round(totalRecebidoAcumulado * 100) / 100;
+                saldoRestante = Math.max(0, Math.round((valorOrig - totalRecebidoAcumulado) * 100) / 100);
+            }
+
             const isQuitacao = saldoRestante <= 0;
 
             const tituloRecibo = isQuitacao ? 'RECIBO DE QUITAÇÃO' : 'RECIBO DE PAGAMENTO';
@@ -2912,7 +3849,7 @@
 
                         <div style="margin-top:16px; padding:12px; border:1px solid #94a3b8; background:#f8fafc; font-size:11px; line-height:1.6; border-radius:6px;">
                             <strong>DECLARAÇÃO DE RECEBIMENTO:</strong><br>
-                            Declaramos para os devidos fins que recebemos de <strong>${escapeHtml(nota.cliente ? nota.cliente.toUpperCase() : 'CLIENTE')}</strong> a importância de <strong>${formatadorMoeda.format(valorPago)}</strong> através de <strong>${escapeHtml(pagto.formaPagamento || 'Dinheiro')}</strong>, referente ao ${isQuitacao ? '<strong>PAGAMENTO TOTAL E QUITAÇÃO DEFINITIVA</strong>' : '<strong>PAGAMENTO PARCIAL</strong>'} da Nota a Prazo nº <strong>${escapeHtml(nota.numeroControle || nota.id)}</strong>${saldoRestante > 0 ? `, restando o saldo de <strong>${formatadorMoeda.format(saldoRestante)}</strong>` : ''}.
+                            Declaramos para os devidos fins que recebemos de <strong>${escapeHtml(nota.cliente ? nota.cliente.toUpperCase() : 'CLIENTE')}</strong> a importância de <strong>${formatadorMoeda.format(valorPago)} (${valorPorExtensoBRL(valorPago)})</strong> através de <strong>${escapeHtml(pagto.formaPagamento || 'Dinheiro')}</strong>, referente ao ${isQuitacao ? '<strong>PAGAMENTO TOTAL E QUITAÇÃO DEFINITIVA</strong>' : '<strong>PAGAMENTO PARCIAL</strong>'} da Nota a Prazo nº <strong>${escapeHtml(nota.numeroControle || nota.id)}</strong>${saldoRestante > 0 ? `, restando o saldo de <strong>${formatadorMoeda.format(saldoRestante)}</strong>` : ''}.
                         </div>
                     </div>
 
@@ -2946,6 +3883,22 @@
         
         resetDatas();
         resetDatasNotaPrazo();
+        if (typeof atualizarBadgeNotasSemVinculo === 'function') {
+            atualizarBadgeNotasSemVinculo();
+        }
+
+        // ==========================================
+        // REGISTRO DE SERVICE WORKER PWA
+        // ==========================================
+        if ('serviceWorker' in navigator && (window.location.protocol === 'http:' || window.location.protocol === 'https:')) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').then((reg) => {
+                    console.log('[PWA] Service Worker registrado com sucesso:', reg.scope);
+                }).catch((err) => {
+                    console.warn('[PWA] Service Worker não registrado:', err);
+                });
+            });
+        }
 
     </script>
 </body>

@@ -67,6 +67,27 @@
       }
     },
 
+    "clientes": {
+      ".read": "auth != null",
+      ".indexOn": ["codigo", "nome", "cpfCnpj"],
+      "$clienteId": {
+        ".write": "auth != null",
+        ".validate": "newData.hasChildren(['id', 'nome'])",
+        "id": {
+          ".validate": "newData.isString() && (!data.exists() || newData.val() === data.val())"
+        },
+        "nome": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "codigo": {
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+        "limiteCredito": {
+          ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0) || newData.isString()"
+        }
+      }
+    },
+
     "sequencias": {
       ".read": "auth != null",
       "notasPrazo": {
@@ -74,6 +95,36 @@
       },
       "recibos": {
         ".write": "auth != null && newData.isNumber() && (!data.exists() || newData.val() > data.val())"
+      },
+      "clientes": {
+        ".write": "auth != null"
+      },
+      "notasInutilizadas": {
+        ".write": "auth != null"
+      },
+      "recibosInutilizados": {
+        ".write": "auth != null"
+      }
+    },
+
+    "configuracoes": {
+      ".read": "auth != null",
+      "empresa": {
+        ".write": "auth != null",
+        ".validate": "newData.hasChildren(['nomeFantasia'])",
+        "nomeFantasia": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "diasAlertaVencimento": {
+          ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 1 && newData.val() <= 30) || newData.isString()"
+        }
+      },
+      "seguranca": {
+        ".write": "auth != null",
+        ".validate": "newData.hasChildren(['hashSenhaMaster'])",
+        "hashSenhaMaster": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        }
       }
     }
   }

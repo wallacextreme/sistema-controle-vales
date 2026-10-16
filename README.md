@@ -1,90 +1,132 @@
-# Tucano Cloud - Vales de Crédito & Notas a Prazo
+# Tucano Cloud — Vales de Crédito, Notas a Prazo & Crediário Comercial
 
-Sistema completo de gestão comercial para varejo e lojas, contendo dois módulos independentes de alta precisão: **Vales de Crédito ao Consumidor** e **Notas a Prazo (Contas a Receber)**. Desenvolvido como aplicação desktop de alta performance utilizando **Tauri v2** e **Firebase Realtime Database**.
+[![GitHub Pages](https://img.shields.io/badge/Demo-GitHub%20Pages-blue?style=for-the-badge&logo=github)](https://wallacextreme.github.io/sistema-controle-vales/)
+[![Tauri v2](https://img.shields.io/badge/Desktop-Tauri%20v2-orange?style=for-the-badge&logo=tauri)](https://tauri.app/)
+[![Rust](https://img.shields.io/badge/Rust-1.96-black?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
+[![Firebase](https://img.shields.io/badge/Database-Firebase%20RTDB-amber?style=for-the-badge&logo=firebase)](https://firebase.google.com/)
+[![PWA](https://img.shields.io/badge/PWA-Offline--First-violet?style=for-the-badge&logo=pwa)](https://web.dev/progressive-web-apps/)
+[![Windows](https://img.shields.io/badge/Instaladores-.EXE%20%7C%20.MSI-0078D6?style=for-the-badge&logo=windows)](https://github.com/wallacextreme/sistema-controle-vales/releases)
 
----
+Sistema corporativo de alta precisão para gestão comercial de varejo e lojas, contendo controle de **Vales de Crédito ao Consumidor**, **Notas a Prazo / Crediário Comercial**, **Carteira de Clientes**, **Relatórios Financeiros com Auto-Soma**, **Motor de Impressão A4**, **Integração WhatsApp** e **Auditoria Imutável**.
 
-## 🚀 Módulos do Sistema
-
-### 1. 🏷️ Vales de Crédito
-- **Emissão Ágil**: Cadastro com cliente, vendedor, autorizador, valor e datas de emissão/validade.
-- **Controle de Saldo e Amortizações**: Baixas parciais e totais com histórico por operação.
-- **Impressão Térmica / Meia Folha A4**: Layout otimizado para meia folha A4 com vias para carimbo/assinatura.
-- **Painel de Auditoria e CSV**: Exportação para contabilidade e auditoria com senha mestre.
-
-### 2. 📅 Notas a Prazo (Contas a Receber)
-- **Emissão e Cálculo de Vencimento**: Cálculo automático de 30 dias corridos (com precisão para viradas de mês, anos bissextos e viradas de ano). Identificador legível único `NP-XXXXXXXX`.
-- **Baixas e Amortizações Múltiplas**: Controle estrito de saldo devedor. Bloqueio automático de pagamentos acima do saldo ou em notas já quitadas/canceladas.
-- **Recibos Individuais**: Cada pagamento gera seu próprio recibo numerado `REC-XXXXXXXX`.
-- **Estorno Seguro**: Pagamentos incorretos podem ser estornados com senha mestre e motivo registrado, sem apagar o histórico da auditoria.
-- **Cancelamento Controlado**: Notas canceladas são mantidas no banco de dados para conformidade fiscal e auditoria.
-- **Impressão Independente em A4**:
-  - Comprovante de Nota a Prazo em A4 com Termo de Reconhecimento de Dívida.
-  - Recibo de Pagamento Parcial / Recibo de Quitação Definitiva em A4 com texto declaratório e assinaturas da empresa e do cliente.
-- **Dashboard e Filtros em Tempo Real**: Métricas consolidadas (Abertas, Parciais, Vencendo, Vencidas, Quitadas, Recebido Hoje) e busca avançada por cliente, NP, pedido, NF e telefone.
+Desenvolvido para execução como **Aplicativo Desktop Nativo Windows (.exe e .msi)** via **Tauri v2 (Rust)**, **PWA Instalável** e **Web App** sobre **Google Firebase Realtime Database**.
 
 ---
 
-## 🛠️ Tecnologias Utilizadas
-
-- **Frontend**: HTML5, Vanilla JavaScript, CSS3 com TailwindCSS e componentes SweetAlert2.
-- **Backend / Desktop**: [Tauri v2](https://tauri.app/) (Rust) - executável nativo leve e seguro.
-- **Banco de Dados & Autenticação**: Google Firebase (Realtime Database `/vales` e `/notasPrazo` independentes + Firebase Authentication).
-- **Utilitários**: IMask (máscaras monetárias) e html2pdf.js.
+## 🌐 Demonstração Online & Links
+- **Demo Online (GitHub Pages):** [https://wallacextreme.github.io/sistema-controle-vales/](https://wallacextreme.github.io/sistema-controle-vales/)
+- **Repositório GitHub:** [https://github.com/wallacextreme/sistema-controle-vales](https://github.com/wallacextreme/sistema-controle-vales)
+- **Instaladores Windows Oficiais:** Disponíveis na pasta `src-tauri/target/release/bundle/` (`.msi` e `.exe`).
 
 ---
 
-## 📦 Como Executar e Configurar
+## 🚀 Funcionalidades Principais
 
-### 1. Clonar o repositório
-```bash
-git clone https://github.com/wallacextreme/sistema-controle-vales.git
-cd sistema-controle-vales
-```
+### 1. 👥 Carteira e Cadastro de Clientes (`CLI-XXXX`)
+- **Sequência Atômica de Clientes:** Geração automática e concorrente de códigos sequenciais (`CLI-0001`, `CLI-0002`...).
+- **Ficha Financeira Completa:** Visão 360° do cliente com total comprado, total pago, saldo devedor atual e limite de crédito com cálculo em tempo real de saldo disponível.
+- **Validação Estrita de Documentos e Telefones:** Validação algorítmica de CPF/CNPJ com dígitos verificadores e máscara obrigatória de celular com DDD de 11 dígitos.
+- **Conciliação e Vínculo Inteligente:** Localização e vinculação automática de vendas avulsas legadas à ficha cadastral do cliente.
 
-### 2. Configurar o Firebase
-Copie o arquivo de exemplo de configuração e insira as credenciais do seu projeto Firebase Console:
-```bash
-cp src/firebase-config.example.js src/firebase-config.js
-```
-Abra `src/firebase-config.js` e preencha com as credenciais do seu projeto Firebase:
-```javascript
-window.firebaseConfig = {
-    apiKey: "SUA_API_KEY",
-    authDomain: "seu-projeto.firebaseapp.com",
-    databaseURL: "https://seu-projeto-default-rtdb.firebaseio.com",
-    projectId: "seu-projeto",
-    storageBucket: "seu-projeto.firebasestorage.app",
-    messagingSenderId: "SEU_SENDER_ID",
-    appId: "SEU_APP_ID"
-};
-```
+### 2. 📅 Notas a Prazo & Crediário Comercial (`NP-XXXXXX`)
+- **Sequência Atômica e Imutável:** Numeração distribuída `NP-000001` sem colisões.
+- **Cálculo Preciso de Vencimento:** Prazos rápidos de 15, 30, 45 ou 60 dias com tratamento exato para anos bissextos e viradas de ano.
+- **Baixas e Amortizações Múltiplas:** Suporte a pagamentos parciais acumulados com recibos sequenciais `REC-000001`.
+- **Estorno Seguro:** Bloqueio contra exclusão direta de dados; correções são registradas por evento de estorno com operador, data/hora e motivo obrigatório.
+- **Cancelamento Transacional:** Bloqueia notas canceladas de receberem novas baixas, mantendo histórico contábil.
 
-### 3. Instalar dependências e rodar no Tauri
+### 3. 🏷️ Vales de Crédito ao Consumidor (Módulo Legado Integrado)
+- **Compatibilidade 100%:** Emissão, controle de saldo e baixas de vales de troca ou devolução sem interrupção de formatos legados.
+- **Auditoria e CSV:** Exportação de movimentações e painel de controle protegido por senha mestre.
+
+### 4. 📊 Relatórios Analíticos com Auto-Soma em Tempo Real
+- **Auto-Soma de Centavos Inteiros:** Cálculos financeiros sem erros de arredondamento de ponto flutuante.
+- **Aging de Vencimento:** Categorização automática em faixas de atraso (A Vencer, Vence Hoje, 1 a 30 dias, 31 a 60 dias, 61 a 90 dias e +90 dias).
+- **Subtotais de Caixa por Forma de Pagamento:** Apuração discriminada de Dinheiro, PIX, Cartão de Crédito e Cartão de Débito.
+
+### 5. 🖨️ Motor de Impressão A4 Multipágina
+- **Recibo de Pagamento A4:** Texto declaratório com valor por extenso automático em reais (BRL), saldo devedor restante e vias para assinaturas.
+- **Nota a Prazo A4:** Termo de reconhecimento de dívida com dados completos do credor e devedor.
+- **Extrato Consolidado de Cliente A4:** Histórico completo de compras e amortizações.
+- **Impressão Térmica / Meia Folha:** Preservação dos layouts de vales de crédito.
+
+### 6. 📲 Central de Cobrança e Notificações via WhatsApp
+- **Atalhos Rápidos de 1 Clique:** Envio de lembrete de vencimento, cobrança de títulos em atraso, recibo de pagamento instantâneo e extrato consolidado.
+- **Envio Consolidado:** Botão para disparar todas as notas em aberto juntas com soma total e chave PIX da empresa configurada.
+
+### 7. 💾 Backup Schema V3 com Merge Não-Destrutivo
+- **Merge Cirúrgico:** Restauração não-destrutiva que preserva registros e pagamentos efetuados no servidor, incorporando novos dados sem sobrescrever o banco.
+
+### 8. 📱 PWA (Progressive Web App)
+- **Manifesto Web App:** Ícones adaptativos, tema escuro nativo e modo de exibição `standalone`.
+- **Service Worker (`sw.js`):** Cache-first seguro para o App Shell, mantendo requisições dinâmicas de banco de dados desimpedidas.
+
+---
+
+## 🔒 Segurança, Sigilo de Dados e Proteção de Informações dos Clientes
+
+A proteção dos dados e a segurança das operações do lojista e dos clientes são o pilar central da arquitetura:
+
+1. **Acesso Não Autenticado 100% Bloqueado (`database.rules.json`):**
+   - As regras de segurança do Firebase Realtime Database bloqueiam leitura e escrita anônima (`.read: "auth != null"`, `.write: "auth != null"`). Ninguém tem acesso aos dados dos clientes, notas ou vales sem autenticação ativa.
+2. **Credenciais Protegidas Fora do Repositório (`.gitignore`):**
+   - O arquivo `firebase-config.js` é estritamente ignorado e **nunca** é enviado ao GitHub.
+   - Na ausência do arquivo local de credenciais, o sistema entra em modo placeholder seguro sem conectar ao banco real da loja.
+3. **Senhas Criptografadas com Hash Determinístico:**
+   - A senha mestre para estornos e configurações sensíveis é armazenada exclusivamente em formato de hash criptográfico determinístico (FNV-1a / DJB2). Senhas em texto puro **nunca** são salvas no banco de dados.
+4. **Concorrência Segura por Transações Atômicas:**
+   - Baixas financeiras, cancelamentos e contadores sequenciais utilizam `ref.transaction()` nativo do Firebase, impedindo saldo negativo, troco fantasma ou corridas de rede.
+5. **Idempotência contra Duplos Cliques:**
+   - Tokens únicos `IDEMP-...` impedem a duplicação de baixas ou geração de recibos repetidos em conexões instáveis.
+
+---
+
+## 📦 Como Compilar os Instaladores Desktop (.exe e .msi)
+
+### Pré-requisitos
+- [Node.js](https://nodejs.org/) (versão 18 ou superior)
+- [Rust & Cargo](https://www.rust-lang.org/) (instalador `rustup`)
+- Ferramenta WiX (necessária para geração do pacote `.msi` no Windows)
+
+### Gerando os Instaladores:
 ```bash
-# Com Bun ou NPM:
-bun install
-bun run tauri dev
-# ou:
+# Instalar dependências
 npm install
-npm run tauri dev
+
+# Compilar instaladores Windows completos (.exe com instalador NSIS e .msi)
+npm run build:windows
+
+# Ou individualmente:
+npm run build:exe
+npm run build:msi
 ```
+
+Os arquivos gerados são gravados em:
+- **Instalador NSIS (.exe):** `src-tauri/target/release/bundle/nsis/controle-vales-tucano_0.1.0_x64-setup.exe`
+- **Pacote Windows Installer (.msi):** `src-tauri/target/release/bundle/msi/controle-vales-tucano_0.1.0_x64_en-US.msi`
 
 ---
 
-## 🔒 Segurança, Concorrência e Blindagem de Dados
+## 🧪 Suíte de Testes Automatizados
 
-- **Proteção Concorrente de Baixas**: Baixas utilizam transações atômicas nativas do Firebase (`ref.transaction()`). O saldo real do servidor é revalidado no momento da gravação, impedindo que acessos simultâneos resultem em saldo negativo ou cobranças acima do valor devido.
-- **Cancelamento e Estorno Transacionais**: Operações de cancelamento de notas e estorno de pagamentos também são executadas via `ref.transaction()`, eliminando condições de corrida entre cancelamento simultâneo e novos pagamentos, além de rejeitar estornos duplicados concorrentes.
-- **Idempotência (Proteção contra Duplo Clique e Retries)**: Cada tentativa de baixa gera um token único de idempotência (`IDEMP-...`). Cliques múltiplos ou reenvios após oscilação de conexão retornam o recibo já gravado sem duplicar pagamentos ou consumir números sequenciais.
-- **Sequências Atômicas Distribuídas (`NP-000001` / `REC-000001`)**: Contadores atômicos em `/sequencias/notasPrazo` e `/sequencias/recibos` garantem unicidade absoluta e ordenação estrita entre múltiplos computadores conectados, sem reutilização de números em cancelamentos ou estornos e com seed automático que protege identificadores existentes.
-- **Regras de Segurança de Produção**: Arquivo `database.rules.json` incluído para validação e restrição estrita de permissões nas coleções `/vales`, `/notasPrazo` e `/sequencias`, garantindo imutabilidade de IDs e validação de tipos de dados.
-- **Dashboard Financeiro Auditável**: Exibição detalhada de Total a Receber (saldo ativo), Total Recebido, Total Emitido Bruto, (-) Cancelado e Total Emitido Líquido Ativo.
-- **Backup com Pré-Visualização e Merge Não-Destrutivo**:
-  - Antes da importação, uma tela de pré-visualização apresenta a contagem de registros novos, existentes e pagamentos a incorporar.
-  - A importação realiza **merge individualizado** por chave e subcoleção (`/pagamentos/{id}`).
-  - **Nunca** utiliza `set()` na nota inteira sobre registros existentes, impedindo que backups antigos apaguem pagamentos mais recentes efetuados em produção.
-  - Backups legados v1 (`[ { ... } ]`) continuam 100% suportados e restauráveis sem conflitos.
-- **Histórico Imutável e Auditoria**: Pagamentos confirmados não podem ser alterados diretamente. Correções são tratadas exclusivamente via **Estorno**, gerando um novo evento de auditoria com operador, data e justificativa obrigatória, recalculando o saldo e preservando o recibo original.
-- **Zero Migração Destrutiva**: A coleção legada `/vales` e seus layouts de impressão em meia folha A4 permanecem 100% intactos.
-- **Suíte de Testes Automatizados**: A suíte em `tests/run_all_audits.cjs` valida sequências atômicas distribuídas, cenários concorrentes de pagamentos simultâneos (2x R$700 e 2x R$500), estornos concorrentes, cancelamento concorrente vs baixa, idempotência com retries de rede, merge não-destrutivo de backups e compatibilidade com registros legados.
+O sistema inclui suítes completas de testes automatizados e validações de integridade:
+
+```bash
+node tests/run_suite_completa.cjs
+```
+
+**Módulos Validados:**
+- `tests/test_nucleo_financeiro.cjs`: Precisão de centavos, auto-soma e normalização monetária.
+- `tests/test_fase1_clientes.cjs`: Validações de CPF/CNPJ, máscaras, limites e carteira consolidada.
+- `tests/test_fase2_relatorios.cjs`: Métricas analíticas, aging de atraso e agrupamentos de caixa.
+- `tests/test_fase3_impressao_config.cjs`: Geradores de HTML para impressão A4 e meia folha.
+- `tests/test_fase4_final.cjs`: WhatsApp, backup V3, hash de senhas e resolvedor universal da Fase 6.
+- `tests/test_integridade_index.cjs`: Verificação estrutural do `index.html`, modais, z-index e atalhos.
+- `tests/test_rules_semantics.cjs`: Auditoria semântica das regras de segurança do Firebase.
+- `tests/run_all_audits.cjs`: Testes concorrentes de concorrência transacional (2x R$700 e 2x R$500).
+
+---
+
+## 👨‍💻 Autor & Licença
+Desenvolvido por **Wallace** ([@wallacextreme](https://github.com/wallacextreme)).  
+Todos os direitos reservados à Tucano Auto Peças.

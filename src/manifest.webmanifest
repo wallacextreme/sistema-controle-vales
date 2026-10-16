@@ -1,0 +1,37 @@
+{
+  "name": "Tucano Cloud - Vales & Crediário",
+  "short_name": "Tucano Cloud",
+  "description": "Sistema de Gestão Comercial: Vales de Crédito, Notas a Prazo, Crediário e Cobrança - Tucano Auto Peças",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "finance", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Emitir Vale",
+      "url": "./index.html#vales",
+      "description": "Emissão ágil de vale de crédito"
+    },
+    {
+      "name": "Emitir Nota a Prazo",
+      "url": "./index.html#notas",
+      "description": "Lançamento de venda a prazo"
+    },
+    {
+      "name": "Carteira de Clientes",
+      "url": "./index.html#clientes",
+      "description": "Posição e ficha financeira de clientes"
+    }
+  ]
+}

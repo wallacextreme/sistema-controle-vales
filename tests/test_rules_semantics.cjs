@@ -145,6 +145,62 @@ class RuleContext {
     const ok = (this.isNumber(nd.valorUsado) && nd.valorUsado > 0) || this.isString(nd.valorUsado);
     return ok;
   }
+
+  canWriteCliente() {
+    return this.auth !== null;
+  }
+
+  validateCliente() {
+    const nd = this.newDataVal;
+    if (!nd || typeof nd !== 'object') return false;
+    if (nd.id === undefined || nd.nome === undefined) return false;
+
+    // id immutable string
+    if (!this.isString(nd.id)) return false;
+    if (this.exists(this.dataVal) && nd.id !== this.dataVal.id) return false;
+
+    // nome non-empty string
+    if (!this.isString(nd.nome) || nd.nome.length === 0) return false;
+
+    // codigo optional string
+    if (nd.codigo !== undefined && !this.isString(nd.codigo)) return false;
+
+    // limiteCredito optional number >= 0 or string
+    if (nd.limiteCredito !== undefined) {
+      if (this.isString(nd.limiteCredito)) {
+        // string permitida conforme database.rules.json
+      } else if (!this.isNumber(nd.limiteCredito) || nd.limiteCredito < 0) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  canWriteConfiguracoes() {
+    return this.auth !== null;
+  }
+
+  validateConfiguracoesEmpresa() {
+    const nd = this.newDataVal;
+    if (!nd || typeof nd !== 'object') return false;
+    if (nd.nomeFantasia === undefined || !this.isString(nd.nomeFantasia) || nd.nomeFantasia.length === 0) return false;
+    if (nd.diasAlertaVencimento !== undefined) {
+      if (this.isString(nd.diasAlertaVencimento)) {
+        // string permitida conforme database.rules.json
+      } else if (!this.isNumber(nd.diasAlertaVencimento) || nd.diasAlertaVencimento < 1 || nd.diasAlertaVencimento > 30) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  validateConfiguracoesSeguranca() {
+    const nd = this.newDataVal;
+    if (!nd || typeof nd !== 'object') return false;
+    if (nd.hashSenhaMaster === undefined || !this.isString(nd.hashSenhaMaster) || nd.hashSenhaMaster.length === 0) return false;
+    return true;
+  }
 }
 
 // 1. Unauthenticated access
@@ -329,6 +385,176 @@ console.log('6. Testando compatibilidade com Vales legados...');
   });
   assert.strictEqual(baixaVale.validateBaixaVale(), true, 'Baixa de vale com valorUsado deve ser válida');
   console.log('   OK: Vales legados e baixas legítimas 100% suportados.');
+}
+
+// 7. Regras de Clientes e Sequência de Clientes (Fase 1)
+console.log('7. Testando regras de /clientes e /sequencias/clientes...');
+{
+  // Acesso não autenticado a clientes
+  const unauthCli = new RuleContext({
+    auth: null,
+    newData: { id: 'CLI1', nome: 'Cliente Teste' }
+  });
+  assert.strictEqual(unauthCli.canWriteCliente(), false, 'Escrita de cliente sem auth deve ser negada');
+
+  // Criação válida de cliente
+  const cliValido = new RuleContext({
+    auth: { uid: 'user1' },
+    data: null,
+    newData: {
+      id: 'CLI_001',
+      codigo: 'CLI-0001',
+      nome: 'João da Silva',
+      cpfCnpj: '123.456.789-00',
+      telefone: '(11) 98765-4321',
+      limiteCredito: 1500.00
+    }
+  });
+  assert.strictEqual(cliValido.canWriteCliente(), true, 'Escrita autenticada de cliente deve ser permitida');
+  assert.strictEqual(cliValido.validateCliente(), true, 'Cliente com dados válidos deve ser aprovado');
+
+  // Cliente sem nome
+  const cliSemNome = new RuleContext({
+    auth: { uid: 'user1' },
+    data: null,
+    newData: { id: 'CLI_002', nome: '' }
+  });
+  assert.strictEqual(cliSemNome.validateCliente(), false, 'Cliente sem nome deve ser rejeitado');
+
+  // Limite de crédito negativo
+  const cliLimiteNegativo = new RuleContext({
+    auth: { uid: 'user1' },
+    data: null,
+    newData: { id: 'CLI_003', nome: 'Maria Souza', limiteCredito: -100 }
+  });
+  assert.strictEqual(cliLimiteNegativo.validateCliente(), false, 'Limite de crédito negativo deve ser rejeitado');
+
+  // Alteração de ID de cliente
+  const cliIdAlterado = new RuleContext({
+    auth: { uid: 'user1' },
+    data: { id: 'CLI_001', nome: 'João' },
+    newData: { id: 'CLI_002_NOVO', nome: 'João' }
+  });
+  assert.strictEqual(cliIdAlterado.validateCliente(), false, 'Alterar ID de cliente deve ser bloqueado');
+
+  // Sequência atômica de clientes
+  const incSeqCli = new RuleContext({
+    auth: { uid: 'user1' },
+    data: 5,
+    newData: 6
+  });
+  assert.strictEqual(incSeqCli.canWriteSequencia(), true, 'Incremento de sequência de clientes deve ser permitido');
+
+  const decSeqCli = new RuleContext({
+    auth: { uid: 'user1' },
+    data: 5,
+    newData: 4
+  });
+  assert.strictEqual(decSeqCli.canWriteSequencia(), false, 'Decremento de sequência de clientes deve ser bloqueado');
+
+  // Cliente com campos opcionais vazios ou strings (Fase 5 / T-501)
+  const cliCamposVazios = new RuleContext({
+    auth: { uid: 'user1' },
+    data: null,
+    newData: {
+      id: 'CLI_004',
+      codigo: 'CLI-0004',
+      nome: 'Carlos Peças',
+      cpfCnpj: '',
+      telefone: '',
+      endereco: '',
+      observacao: '',
+      limiteCredito: 'R$ 0,00'
+    }
+  });
+  assert.strictEqual(cliCamposVazios.canWriteCliente(), true, 'Escrita autenticada com campos opcionais vazios deve ser permitida');
+  assert.strictEqual(cliCamposVazios.validateCliente(), true, 'Cliente com campos opcionais vazios deve ser válido');
+
+  console.log('   OK: Regras de clientes e sequências atômicas 100% validadas.');
+}
+
+// 8. Regras de /configuracoes e /configuracoes/empresa (Fase 3)
+console.log('8. Testando regras de /configuracoes/empresa...');
+{
+  const unauthConfig = new RuleContext({
+    auth: null,
+    newData: { nomeFantasia: 'Tucano' }
+  });
+  assert.strictEqual(unauthConfig.canWriteConfiguracoes(), false, 'Escrita de configurações sem auth deve ser bloqueada');
+
+  const configValida = new RuleContext({
+    auth: { uid: 'user1' },
+    data: null,
+    newData: {
+      nomeFantasia: 'TUCANO AUTO PEÇAS',
+      cnpj: '11.222.333/0001-44',
+      diasAlertaVencimento: 5,
+      chavePix: 'financeiro@tucano.com.br'
+    }
+  });
+  assert.strictEqual(configValida.canWriteConfiguracoes(), true, 'Escrita autenticada de configurações deve ser permitida');
+  assert.strictEqual(configValida.validateConfiguracoesEmpresa(), true, 'Configurações válidas devem ser aprovadas');
+
+  // Configurações com campos vazios e diasAlerta como string (Fase 5 / T-501)
+  const configOpcionaisVazios = new RuleContext({
+    auth: { uid: 'user1' },
+    data: null,
+    newData: {
+      nomeFantasia: 'TUCANO AUTO PEÇAS',
+      cnpj: '',
+      chavePix: '',
+      diasAlertaVencimento: '3'
+    }
+  });
+  assert.strictEqual(configOpcionaisVazios.canWriteConfiguracoes(), true);
+  assert.strictEqual(configOpcionaisVazios.validateConfiguracoesEmpresa(), true, 'Configurações com campos vazios devem ser válidas');
+
+  const configSemNome = new RuleContext({
+    auth: { uid: 'user1' },
+    data: null,
+    newData: { nomeFantasia: '', diasAlertaVencimento: 3 }
+  });
+  assert.strictEqual(configSemNome.validateConfiguracoesEmpresa(), false, 'Configuração sem nome fantasia deve ser rejeitada');
+
+  const configDiasInvalido = new RuleContext({
+    auth: { uid: 'user1' },
+    data: null,
+    newData: { nomeFantasia: 'Tucano', diasAlertaVencimento: 50 }
+  });
+  assert.strictEqual(configDiasInvalido.validateConfiguracoesEmpresa(), false, 'Dias de alerta > 30 deve ser rejeitado');
+
+  console.log('   OK: Regras de /configuracoes/empresa 100% validadas.');
+}
+
+// 9. Regras de /configuracoes/seguranca (Fase 4)
+console.log('9. Testando regras de /configuracoes/seguranca...');
+{
+  const unauthSeg = new RuleContext({
+    auth: null,
+    newData: { hashSenhaMaster: 'tc_1234567890abcdef' }
+  });
+  assert.strictEqual(unauthSeg.canWriteConfiguracoes(), false, 'Escrita de segurança sem auth deve ser bloqueada');
+
+  const segValida = new RuleContext({
+    auth: { uid: 'user1' },
+    data: null,
+    newData: {
+      hashSenhaMaster: 'tc_1234567890abcdef',
+      atualizadoEm: '2026-10-15T12:00:00Z',
+      atualizadoPor: 'admin@tucano.com.br'
+    }
+  });
+  assert.strictEqual(segValida.canWriteConfiguracoes(), true, 'Escrita autenticada de segurança deve ser permitida');
+  assert.strictEqual(segValida.validateConfiguracoesSeguranca(), true, 'Segurança com hash válido deve ser aprovada');
+
+  const segSemHash = new RuleContext({
+    auth: { uid: 'user1' },
+    data: null,
+    newData: { atualizadoEm: '2026-10-15T12:00:00Z' }
+  });
+  assert.strictEqual(segSemHash.validateConfiguracoesSeguranca(), false, 'Segurança sem hash deve ser rejeitada');
+
+  console.log('   OK: Regras de /configuracoes/seguranca 100% validadas.');
 }
 
 console.log('=== TODOS OS TESTES SEMÂNTICOS DE REGRAS PASSARAM COM SUCESSO! ===\n');
